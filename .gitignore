@@ -148,3 +148,8 @@ vite.config.ts.timestamp-*
 # Turbo Repo
 .turbo
 
+
+# Trellis runtime data (real Jira data lives here; never commit it)
+workspace/*
+!workspace/README.md
+!workspace/AGENTS.md

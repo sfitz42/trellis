@@ -1,0 +1,758 @@
+{
+  "pulledAt": "2026-10-01T09:42:00.000Z",
+  "project": {
+    "site": "example.atlassian.net",
+    "key": "PROJ",
+    "name": "Platform Rebuild"
+  },
+  "epics": {
+    "PROJ-40": {
+      "id": "PROJ-40",
+      "summary": "Identity & SSO",
+      "description": "Sample epic: Identity & SSO.",
+      "status": "In Progress",
+      "startDate": null,
+      "dueDate": "2026-11-30",
+      "ticketOrder": [
+        "PROJ-100",
+        "PROJ-101",
+        "PROJ-102",
+        "PROJ-103",
+        "PROJ-104",
+        "PROJ-105",
+        "PROJ-106"
+      ]
+    },
+    "PROJ-41": {
+      "id": "PROJ-41",
+      "summary": "Data migration",
+      "description": "Sample epic: Data migration.",
+      "status": "To Do",
+      "startDate": null,
+      "dueDate": "2027-02-28",
+      "ticketOrder": [
+        "PROJ-120",
+        "PROJ-121",
+        "PROJ-122",
+        "PROJ-123",
+        "PROJ-124",
+        "PROJ-125",
+        "PROJ-126",
+        "PROJ-127",
+        "PROJ-128"
+      ]
+    },
+    "PROJ-42": {
+      "id": "PROJ-42",
+      "summary": "Billing v2",
+      "description": "Sample epic: Billing v2.",
+      "status": "To Do",
+      "startDate": null,
+      "dueDate": "2027-04-30",
+      "ticketOrder": [
+        "PROJ-140",
+        "PROJ-141",
+        "PROJ-142",
+        "PROJ-143",
+        "PROJ-144",
+        "PROJ-145",
+        "PROJ-146",
+        "PROJ-147"
+      ]
+    },
+    "PROJ-43": {
+      "id": "PROJ-43",
+      "summary": "Notifications service",
+      "description": "Sample epic: Notifications service.",
+      "status": "To Do",
+      "startDate": null,
+      "dueDate": null,
+      "ticketOrder": [
+        "PROJ-160",
+        "PROJ-161",
+        "PROJ-162",
+        "PROJ-163",
+        "PROJ-164",
+        "PROJ-165"
+      ]
+    },
+    "PROJ-44": {
+      "id": "PROJ-44",
+      "summary": "Admin console",
+      "description": "Sample epic: Admin console.",
+      "status": "In Progress",
+      "startDate": null,
+      "dueDate": "2026-12-31",
+      "ticketOrder": [
+        "PROJ-180",
+        "PROJ-181",
+        "PROJ-182",
+        "PROJ-183"
+      ]
+    }
+  },
+  "tickets": {
+    "PROJ-100": {
+      "id": "PROJ-100",
+      "epicId": "PROJ-40",
+      "issueType": "Story",
+      "summary": "Add SAML login option",
+      "description": "Sample description for \"Add SAML login option\".",
+      "status": "Done",
+      "assignee": {
+        "accountId": "acc-0001",
+        "displayName": "Avery Stone"
+      },
+      "labels": [],
+      "storyPoints": null,
+      "links": [
+        {
+          "type": "blocks",
+          "target": "PROJ-182"
+        }
+      ]
+    },
+    "PROJ-101": {
+      "id": "PROJ-101",
+      "epicId": "PROJ-40",
+      "issueType": "Story",
+      "summary": "Session timeout settings",
+      "status": "In Progress",
+      "assignee": {
+        "accountId": "acc-0002",
+        "displayName": "Blake Rivers"
+      },
+      "labels": [
+        "backend"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-102": {
+      "id": "PROJ-102",
+      "epicId": "PROJ-40",
+      "issueType": "Task",
+      "summary": "Map roles from identity provider",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0003",
+        "displayName": "Casey Moor"
+      },
+      "labels": [
+        "frontend"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-103": {
+      "id": "PROJ-103",
+      "epicId": "PROJ-40",
+      "issueType": "Story",
+      "summary": "Login audit trail",
+      "description": "Sample description for \"Login audit trail\".",
+      "status": "To Do",
+      "assignee": null,
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-104": {
+      "id": "PROJ-104",
+      "epicId": "PROJ-40",
+      "issueType": "Bug",
+      "summary": "Fix redirect loop after logout",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0005",
+        "displayName": "Emery Vale"
+      },
+      "labels": [
+        "backend",
+        "security"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-105": {
+      "id": "PROJ-105",
+      "epicId": "PROJ-40",
+      "issueType": "Task",
+      "summary": "SSO admin setup guide",
+      "status": "In Progress",
+      "assignee": {
+        "accountId": "acc-0001",
+        "displayName": "Avery Stone"
+      },
+      "labels": [
+        "docs"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-106": {
+      "id": "PROJ-106",
+      "epicId": "PROJ-40",
+      "issueType": "Story",
+      "summary": "Remember last tenant",
+      "description": "Sample description for \"Remember last tenant\".",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0002",
+        "displayName": "Blake Rivers"
+      },
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-120": {
+      "id": "PROJ-120",
+      "epicId": "PROJ-41",
+      "issueType": "Story",
+      "summary": "Map legacy customer schema",
+      "description": "Sample description for \"Map legacy customer schema\".",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0002",
+        "displayName": "Blake Rivers"
+      },
+      "labels": [
+        "backend"
+      ],
+      "storyPoints": null,
+      "links": [
+        {
+          "type": "blocks",
+          "target": "PROJ-121"
+        }
+      ]
+    },
+    "PROJ-121": {
+      "id": "PROJ-121",
+      "epicId": "PROJ-41",
+      "issueType": "Task",
+      "summary": "Backfill job with resumable checkpoints",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0003",
+        "displayName": "Casey Moor"
+      },
+      "labels": [
+        "frontend"
+      ],
+      "storyPoints": null,
+      "links": [
+        {
+          "type": "blocks",
+          "target": "PROJ-122"
+        }
+      ]
+    },
+    "PROJ-122": {
+      "id": "PROJ-122",
+      "epicId": "PROJ-41",
+      "issueType": "Story",
+      "summary": "Cutover runbook and rollback plan",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0004",
+        "displayName": "Devon Hale"
+      },
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-123": {
+      "id": "PROJ-123",
+      "epicId": "PROJ-41",
+      "issueType": "Bug",
+      "summary": "Reconcile record counts",
+      "description": "Sample description for \"Reconcile record counts\".",
+      "status": "To Do",
+      "assignee": null,
+      "labels": [
+        "backend",
+        "security"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-124": {
+      "id": "PROJ-124",
+      "epicId": "PROJ-41",
+      "issueType": "Task",
+      "summary": "Dry-run against staging copy",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0001",
+        "displayName": "Avery Stone"
+      },
+      "labels": [
+        "docs"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-125": {
+      "id": "PROJ-125",
+      "epicId": "PROJ-41",
+      "issueType": "Story",
+      "summary": "Archive retired tables",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0002",
+        "displayName": "Blake Rivers"
+      },
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-126": {
+      "id": "PROJ-126",
+      "epicId": "PROJ-41",
+      "issueType": "Bug",
+      "summary": "Duplicate rows after import",
+      "description": "Sample description for \"Duplicate rows after import\".",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0003",
+        "displayName": "Casey Moor"
+      },
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-127": {
+      "id": "PROJ-127",
+      "epicId": "PROJ-41",
+      "issueType": "Story",
+      "summary": "Migration progress dashboard",
+      "status": "To Do",
+      "assignee": null,
+      "labels": [
+        "backend"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-128": {
+      "id": "PROJ-128",
+      "epicId": "PROJ-41",
+      "issueType": "Story",
+      "summary": "Sign-off checklist",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0005",
+        "displayName": "Emery Vale"
+      },
+      "labels": [
+        "frontend"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-140": {
+      "id": "PROJ-140",
+      "epicId": "PROJ-42",
+      "issueType": "Task",
+      "summary": "Provider sandbox account and keys",
+      "description": "Sample description for \"Provider sandbox account and keys\".",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0003",
+        "displayName": "Casey Moor"
+      },
+      "labels": [
+        "frontend"
+      ],
+      "storyPoints": null,
+      "links": [
+        {
+          "type": "blocks",
+          "target": "PROJ-141"
+        }
+      ]
+    },
+    "PROJ-141": {
+      "id": "PROJ-141",
+      "epicId": "PROJ-42",
+      "issueType": "Story",
+      "summary": "Checkout payment intent flow",
+      "status": "Done",
+      "assignee": {
+        "accountId": "acc-0004",
+        "displayName": "Devon Hale"
+      },
+      "labels": [],
+      "storyPoints": null,
+      "links": [
+        {
+          "type": "blocks",
+          "target": "PROJ-142"
+        }
+      ]
+    },
+    "PROJ-142": {
+      "id": "PROJ-142",
+      "epicId": "PROJ-42",
+      "issueType": "Bug",
+      "summary": "Webhook handling and retries",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0005",
+        "displayName": "Emery Vale"
+      },
+      "labels": [
+        "backend",
+        "security"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-143": {
+      "id": "PROJ-143",
+      "epicId": "PROJ-42",
+      "issueType": "Task",
+      "summary": "Invoice PDF template",
+      "description": "Sample description for \"Invoice PDF template\".",
+      "status": "To Do",
+      "assignee": null,
+      "labels": [
+        "docs"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-144": {
+      "id": "PROJ-144",
+      "epicId": "PROJ-42",
+      "issueType": "Story",
+      "summary": "Proration rules",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0002",
+        "displayName": "Blake Rivers"
+      },
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-145": {
+      "id": "PROJ-145",
+      "epicId": "PROJ-42",
+      "issueType": "Feature",
+      "summary": "Refund flow",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0003",
+        "displayName": "Casey Moor"
+      },
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-146": {
+      "id": "PROJ-146",
+      "epicId": "PROJ-42",
+      "issueType": "Bug",
+      "summary": "Rounding error on annual plans",
+      "description": "Sample description for \"Rounding error on annual plans\".",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0004",
+        "displayName": "Devon Hale"
+      },
+      "labels": [
+        "backend"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-147": {
+      "id": "PROJ-147",
+      "epicId": "PROJ-42",
+      "issueType": "Story",
+      "summary": "Tax rate lookup",
+      "status": "To Do",
+      "assignee": null,
+      "labels": [
+        "frontend"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-160": {
+      "id": "PROJ-160",
+      "epicId": "PROJ-43",
+      "issueType": "Story",
+      "summary": "Notification preferences page",
+      "description": "Sample description for \"Notification preferences page\".",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0004",
+        "displayName": "Devon Hale"
+      },
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-161": {
+      "id": "PROJ-161",
+      "epicId": "PROJ-43",
+      "issueType": "Bug",
+      "summary": "Email digest job",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0005",
+        "displayName": "Emery Vale"
+      },
+      "labels": [
+        "backend",
+        "security"
+      ],
+      "storyPoints": null,
+      "links": [
+        {
+          "type": "blocks",
+          "target": "PROJ-103"
+        }
+      ]
+    },
+    "PROJ-162": {
+      "id": "PROJ-162",
+      "epicId": "PROJ-43",
+      "issueType": "Task",
+      "summary": "Push provider integration",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0001",
+        "displayName": "Avery Stone"
+      },
+      "labels": [
+        "docs"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-163": {
+      "id": "PROJ-163",
+      "epicId": "PROJ-43",
+      "issueType": "Story",
+      "summary": "Template versioning",
+      "description": "Sample description for \"Template versioning\".",
+      "status": "To Do",
+      "assignee": null,
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-164": {
+      "id": "PROJ-164",
+      "epicId": "PROJ-43",
+      "issueType": "Bug",
+      "summary": "Unsubscribe link broken in some clients",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0003",
+        "displayName": "Casey Moor"
+      },
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-165": {
+      "id": "PROJ-165",
+      "epicId": "PROJ-43",
+      "issueType": "Story",
+      "summary": "Rate limiting per user",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0004",
+        "displayName": "Devon Hale"
+      },
+      "labels": [
+        "backend"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-180": {
+      "id": "PROJ-180",
+      "epicId": "PROJ-44",
+      "issueType": "Bug",
+      "summary": "User search and filters",
+      "description": "Sample description for \"User search and filters\".",
+      "status": "In Progress",
+      "assignee": {
+        "accountId": "acc-0005",
+        "displayName": "Emery Vale"
+      },
+      "labels": [
+        "backend",
+        "security"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-181": {
+      "id": "PROJ-181",
+      "epicId": "PROJ-44",
+      "issueType": "Task",
+      "summary": "Bulk deactivate users",
+      "status": "To Do",
+      "assignee": {
+        "accountId": "acc-0001",
+        "displayName": "Avery Stone"
+      },
+      "labels": [
+        "docs"
+      ],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-182": {
+      "id": "PROJ-182",
+      "epicId": "PROJ-44",
+      "issueType": "Story",
+      "summary": "Feature flag toggles",
+      "status": "Done",
+      "assignee": {
+        "accountId": "acc-0002",
+        "displayName": "Blake Rivers"
+      },
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-183": {
+      "id": "PROJ-183",
+      "epicId": "PROJ-44",
+      "issueType": "Feature",
+      "summary": "Admin activity log",
+      "description": "Sample description for \"Admin activity log\".",
+      "status": "In Progress",
+      "assignee": null,
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-45": {
+      "id": "PROJ-45",
+      "epicId": null,
+      "issueType": "Task",
+      "summary": "Upgrade CI runners",
+      "status": "To Do",
+      "assignee": null,
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    },
+    "PROJ-46": {
+      "id": "PROJ-46",
+      "epicId": null,
+      "issueType": "Task",
+      "summary": "Tidy README",
+      "status": "To Do",
+      "assignee": null,
+      "labels": [],
+      "storyPoints": null,
+      "links": []
+    }
+  },
+  "workflow": {
+    "statuses": {
+      "Epic": [
+        {
+          "name": "To Do",
+          "category": "new"
+        },
+        {
+          "name": "In Progress",
+          "category": "indeterminate"
+        },
+        {
+          "name": "Done",
+          "category": "done"
+        }
+      ],
+      "Story": [
+        {
+          "name": "To Do",
+          "category": "new"
+        },
+        {
+          "name": "In Progress",
+          "category": "indeterminate"
+        },
+        {
+          "name": "Done",
+          "category": "done"
+        }
+      ],
+      "Task": [
+        {
+          "name": "To Do",
+          "category": "new"
+        },
+        {
+          "name": "In Progress",
+          "category": "indeterminate"
+        },
+        {
+          "name": "Done",
+          "category": "done"
+        }
+      ],
+      "Bug": [
+        {
+          "name": "To Do",
+          "category": "new"
+        },
+        {
+          "name": "In Progress",
+          "category": "indeterminate"
+        },
+        {
+          "name": "Done",
+          "category": "done"
+        }
+      ],
+      "Feature": [
+        {
+          "name": "To Do",
+          "category": "new"
+        },
+        {
+          "name": "In Progress",
+          "category": "indeterminate"
+        },
+        {
+          "name": "Done",
+          "category": "done"
+        }
+      ]
+    },
+    "transitions": null,
+    "assignableUsers": [
+      {
+        "accountId": "acc-0001",
+        "displayName": "Avery Stone"
+      },
+      {
+        "accountId": "acc-0002",
+        "displayName": "Blake Rivers"
+      },
+      {
+        "accountId": "acc-0003",
+        "displayName": "Casey Moor"
+      },
+      {
+        "accountId": "acc-0004",
+        "displayName": "Devon Hale"
+      },
+      {
+        "accountId": "acc-0005",
+        "displayName": "Emery Vale"
+      }
+    ]
+  }
+}

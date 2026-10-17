@@ -1,0 +1,6 @@
+packages:
+  - apps/*
+  - packages/*
+
+# pnpm 11 no longer reads this setting from .npmrc; keep both (see docs/PLAN.md §2).
+ignoreScripts: true
