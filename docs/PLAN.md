@@ -156,7 +156,14 @@ type IssueId = string;               // "PROJ-123" | "NEW-7"
 
 interface Person { accountId: string; displayName: string }
 
-interface Link { type: 'blocks'; target: IssueId }   // "this blocks target"; inverse is derived
+// Any Jira link type is kept and shown; v1 ops only add/remove 'Blocks'. A link may be stored on
+// either issue (Jira returns both sides); diff and validation treat both copies as one link.
+interface Link {
+  type: string;                      // Jira link type name, e.g. 'Blocks', 'Relates'
+  direction: 'outward' | 'inward';   // outward: "this <type> target"; inward: "target <type> this"
+  target: IssueId;
+  jiraLinkId?: string;               // needed to delete the link in Jira
+}
 
 interface Epic {
   id: IssueId;
@@ -203,8 +210,10 @@ interface TimelineConfig {
 ```
 
 - `snapshot.json` = `{ pulledAt, project, epics, tickets, workflow }` — what Jira says. Written only
-  by `packages/jira/pull.ts`. `workflow` holds allowed statuses/transitions per issue type and the
-  assignable users, so the UI can offer valid choices.
+  by `packages/jira/pull.ts`. `workflow` = `{ epicIssueType, statuses, transitions, assignableUsers }`:
+  the epic type name (hierarchy level 1), known statuses per issue type with their category,
+  transitions per type (`null` when Jira can't tell us, as with `acli`; then any known status is
+  allowed), and the people seen on issues, so the UI can offer valid choices.
 - `roadmap.json` = `RoadmapState` without `meta`, pretty-printed with **stable key order** (sorted
   keys, epics/tickets sorted by id). Written by the server only, debounced (~500 ms) after changes.
 - Timeline columns are **display only**. Epics store real dates; changing the scale never changes
@@ -223,6 +232,7 @@ type Op =
   | { type: 'epic.setDates';   id: IssueId; startDate: string | null; dueDate: string | null }
   | { type: 'epic.transition'; id: IssueId; status: string }
   | { type: 'epic.reorder';    id: IssueId; index: number }
+  | { type: 'epic.discardNew'; id: IssueId }          // only for empty NEW-* epics (makes epic.create undoable)
   | { type: 'ticket.create';   tempId?: IssueId; epicId: IssueId | null; fields: Partial<Ticket> & { summary: string } }
   | { type: 'ticket.update';   id: IssueId; fields: Partial<Pick<Ticket,'summary'|'description'|'assignee'|'labels'|'storyPoints'|'issueType'>> }
   | { type: 'ticket.move';     id: IssueId; epicId: IssueId | null; index?: number }

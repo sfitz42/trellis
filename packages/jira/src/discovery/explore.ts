@@ -28,9 +28,9 @@ async function count(jql: string): Promise<number> {
 async function search(jql: string, fields: string): Promise<RawIssue[]> {
   const res = await acliJson<RawIssue[] | { issues: RawIssue[] }>([
     'jira', 'workitem', 'search', '--jql', jql, '--fields', fields, '--paginate',
-  ]).catch((err: Error) => {
+  ]).catch((err: unknown) => {
     // acli prints a non-JSON message for empty results on some versions.
-    if (/no work items|0 work items/i.test(err.message)) return [];
+    if (err instanceof Error && /no work items|0 work items/i.test(err.message)) return [];
     throw err;
   });
   return Array.isArray(res) ? res : res.issues;

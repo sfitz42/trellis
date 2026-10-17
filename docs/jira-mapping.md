@@ -108,11 +108,10 @@ All commands are run with `execFile` (no shell). "JSON" means the command has a 
   difference once epics are found by hierarchy level.
 - §3 `Epic.startDate` and `Ticket.storyPoints` are Trellis-owned, not Jira fields; §6 changeset
   must skip them.
-- §3 `Link` only models `blocks`. Jira links have a type and a direction; consider keeping any link
-  type (`{ type: string; direction: 'outward' | 'inward'; target; jiraLinkId? }`) and only *editing*
-  Blocks in v1.
-- §3 `snapshot.workflow`: transitions can't be listed (gap 2), so it holds statuses per type with
-  categories plus the people seen, and `transitions: null`.
+- ~~§3 `Link` only models `blocks`.~~ Done in Phase 1: any link type is kept, with direction and
+  Jira link id; v1 ops only edit Blocks.
+- ~~§3 `snapshot.workflow`.~~ Done in Phase 1: statuses per type with categories, the epic type
+  name, people seen, and `transitions: null` when unknown (gap 2).
 - §6/§7 `epic.setDates` and `ticket.move` are blocked by gap 1 for existing issues.
 - §7 `packages/jira/config.json` isn't needed: nothing project-specific is hard-coded.
 

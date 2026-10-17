@@ -4,3 +4,6 @@ packages:
 
 # pnpm 11 no longer reads this setting from .npmrc; keep both (see docs/PLAN.md §2).
 ignoreScripts: true
+
+# Pin exact versions when adding dependencies.
+saveExact: true

@@ -46,7 +46,7 @@ export async function acli(args: readonly string[]): Promise<AcliResult> {
     return { stdout, stderr };
   } catch (err) {
     const e = err as { stdout?: string; stderr?: string; message: string };
-    throw new Error(`acli ${args.join(' ')} failed: ${e.stderr?.trim() || e.stdout?.trim() || e.message}`);
+    throw new Error(`acli ${args.join(' ')} failed: ${e.stderr?.trim() || e.stdout?.trim() || e.message}`, { cause: err });
   }
 }
 

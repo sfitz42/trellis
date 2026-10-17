@@ -11,13 +11,13 @@ const blocked = [
   ['jira', 'workitem', 'delete'],
   ['jira', 'auth', 'logout'],
 ];
-for (const args of blocked) assert.throws(() => assertReadOnly(args), WriteBlockedError, args.join(' '));
+for (const args of blocked) assert.throws(() => { assertReadOnly(args); }, WriteBlockedError, args.join(' '));
 
 const allowed = [
   ['jira', 'auth', 'status'],
   ['jira', 'workitem', 'search', '--jql', 'project = X'],
   ['jira', 'workitem', 'create', '--help'],
 ];
-for (const args of allowed) assert.doesNotThrow(() => assertReadOnly(args), args.join(' '));
+for (const args of allowed) assert.doesNotThrow(() => { assertReadOnly(args); }, args.join(' '));
 
 console.log(`acli guard ok: ${blocked.length} blocked, ${allowed.length} allowed`);

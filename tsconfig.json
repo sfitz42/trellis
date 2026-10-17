@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "packages/shared" },
+    { "path": "packages/shared/test" },
     { "path": "packages/jira" },
     { "path": "packages/cli" },
     { "path": "apps/server" },

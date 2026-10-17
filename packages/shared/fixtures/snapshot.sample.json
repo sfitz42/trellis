@@ -107,8 +107,10 @@
       "storyPoints": null,
       "links": [
         {
-          "type": "blocks",
-          "target": "PROJ-182"
+          "type": "Blocks",
+          "direction": "outward",
+          "target": "PROJ-182",
+          "jiraLinkId": "10104"
         }
       ]
     },
@@ -154,7 +156,14 @@
       "assignee": null,
       "labels": [],
       "storyPoints": null,
-      "links": []
+      "links": [
+        {
+          "type": "Blocks",
+          "direction": "inward",
+          "target": "PROJ-161",
+          "jiraLinkId": "10105"
+        }
+      ]
     },
     "PROJ-104": {
       "id": "PROJ-104",
@@ -221,8 +230,10 @@
       "storyPoints": null,
       "links": [
         {
-          "type": "blocks",
-          "target": "PROJ-121"
+          "type": "Blocks",
+          "direction": "outward",
+          "target": "PROJ-121",
+          "jiraLinkId": "10101"
         }
       ]
     },
@@ -242,8 +253,16 @@
       "storyPoints": null,
       "links": [
         {
-          "type": "blocks",
-          "target": "PROJ-122"
+          "type": "Blocks",
+          "direction": "outward",
+          "target": "PROJ-122",
+          "jiraLinkId": "10100"
+        },
+        {
+          "type": "Blocks",
+          "direction": "inward",
+          "target": "PROJ-120",
+          "jiraLinkId": "10101"
         }
       ]
     },
@@ -259,7 +278,14 @@
       },
       "labels": [],
       "storyPoints": null,
-      "links": []
+      "links": [
+        {
+          "type": "Blocks",
+          "direction": "inward",
+          "target": "PROJ-121",
+          "jiraLinkId": "10100"
+        }
+      ]
     },
     "PROJ-123": {
       "id": "PROJ-123",
@@ -290,7 +316,14 @@
         "docs"
       ],
       "storyPoints": null,
-      "links": []
+      "links": [
+        {
+          "type": "Relates",
+          "direction": "outward",
+          "target": "PROJ-126",
+          "jiraLinkId": "10106"
+        }
+      ]
     },
     "PROJ-125": {
       "id": "PROJ-125",
@@ -319,7 +352,14 @@
       },
       "labels": [],
       "storyPoints": null,
-      "links": []
+      "links": [
+        {
+          "type": "Relates",
+          "direction": "inward",
+          "target": "PROJ-124",
+          "jiraLinkId": "10106"
+        }
+      ]
     },
     "PROJ-127": {
       "id": "PROJ-127",
@@ -367,8 +407,10 @@
       "storyPoints": null,
       "links": [
         {
-          "type": "blocks",
-          "target": "PROJ-141"
+          "type": "Blocks",
+          "direction": "outward",
+          "target": "PROJ-141",
+          "jiraLinkId": "10102"
         }
       ]
     },
@@ -386,8 +428,16 @@
       "storyPoints": null,
       "links": [
         {
-          "type": "blocks",
-          "target": "PROJ-142"
+          "type": "Blocks",
+          "direction": "inward",
+          "target": "PROJ-140",
+          "jiraLinkId": "10102"
+        },
+        {
+          "type": "Blocks",
+          "direction": "outward",
+          "target": "PROJ-142",
+          "jiraLinkId": "10103"
         }
       ]
     },
@@ -406,7 +456,14 @@
         "security"
       ],
       "storyPoints": null,
-      "links": []
+      "links": [
+        {
+          "type": "Blocks",
+          "direction": "inward",
+          "target": "PROJ-141",
+          "jiraLinkId": "10103"
+        }
+      ]
     },
     "PROJ-143": {
       "id": "PROJ-143",
@@ -512,8 +569,10 @@
       "storyPoints": null,
       "links": [
         {
-          "type": "blocks",
-          "target": "PROJ-103"
+          "type": "Blocks",
+          "direction": "outward",
+          "target": "PROJ-103",
+          "jiraLinkId": "10105"
         }
       ]
     },
@@ -621,7 +680,14 @@
       },
       "labels": [],
       "storyPoints": null,
-      "links": []
+      "links": [
+        {
+          "type": "Blocks",
+          "direction": "inward",
+          "target": "PROJ-100",
+          "jiraLinkId": "10104"
+        }
+      ]
     },
     "PROJ-183": {
       "id": "PROJ-183",

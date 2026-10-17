@@ -83,9 +83,13 @@ for (const summary of ['Upgrade CI runners', 'Tidy README']) {
   tickets[id] = { id, epicId: null, issueType: 'Task', summary, status: 'To Do', assignee: null, labels: [], storyPoints: null, links: [] };
 }
 
-// Blocks links, including one across epics and one pointing backwards in time.
+// Blocks links, including one across epics and one pointing backwards in time. Stored on both
+// issues, as Jira returns them (outward on the blocker, inward on the blocked), with a link id.
+let linkId = 10100;
 const link = (from: string, to: string): void => {
-  (tickets[from]?.['links'] as unknown[]).push({ type: 'blocks', target: to });
+  const jiraLinkId = String(linkId++);
+  (tickets[from]?.['links'] as unknown[]).push({ type: 'Blocks', direction: 'outward', target: to, jiraLinkId });
+  (tickets[to]?.['links'] as unknown[]).push({ type: 'Blocks', direction: 'inward', target: from, jiraLinkId });
 };
 link(`${KEY}-121`, `${KEY}-122`); // backfill blocks cutover
 link(`${KEY}-120`, `${KEY}-121`);
@@ -93,6 +97,9 @@ link(`${KEY}-140`, `${KEY}-141`); // sandbox keys block checkout
 link(`${KEY}-141`, `${KEY}-142`);
 link(`${KEY}-100`, `${KEY}-182`); // SSO blocks admin feature flags (cross-epic)
 link(`${KEY}-161`, `${KEY}-103`); // notifications blocks an earlier epic's ticket (backwards in time)
+// A non-Blocks link: kept and shown, never edited in v1.
+(tickets[`${KEY}-124`]?.['links'] as unknown[]).push({ type: 'Relates', direction: 'outward', target: `${KEY}-126`, jiraLinkId: String(linkId++) });
+(tickets[`${KEY}-126`]?.['links'] as unknown[]).push({ type: 'Relates', direction: 'inward', target: `${KEY}-124`, jiraLinkId: String(linkId - 1) });
 
 const snapshot = {
   pulledAt: '2026-10-01T09:42:00.000Z',
