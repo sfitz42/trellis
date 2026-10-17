@@ -30,6 +30,8 @@ export default defineConfig(
       '@typescript-eslint/no-non-null-assertion': 'off',
       // vitest's asymmetric matchers (`expect.any`) are typed `any`.
       '@typescript-eslint/no-unsafe-assignment': 'off',
+      // `http<T>()`-style helpers that type a parsed response body.
+      '@typescript-eslint/no-unnecessary-type-parameters': 'off',
     },
   },
   { files: ['eslint.config.ts'], extends: [tseslint.configs.disableTypeChecked] },

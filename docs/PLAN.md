@@ -290,7 +290,13 @@ Server → client:
 - `batch.applied { batch, results, version }` (to everyone, including sender)
 - `batch.result { requestId, results }` (to sender, for optimistic rollback)
 - `presence { clients: [...] }`, `claims { claims: [...] }`
-- `freeze { frozen }`, `snapshot.reloaded { summary }`, `apply.progress { log }`
+- `freeze { frozen, changeset }`, `snapshot.reloaded { summary, state }`, `apply.progress { log }`
+- `snapshot.available { summary }`: a newer `snapshot.json` is on disk (offered, not auto-merged,
+  unless frozen, where it is the post-apply re-pull and is reloaded straight away)
+- `error { code, message }` for malformed messages or a message before `hello`
+
+Messages are JSON objects with a `type` field (`{ "type": "hello", ... }`); schemas and types live in
+`packages/shared/src/protocol.ts`.
 
 Browser applies its own ops optimistically, then reconciles on `batch.result` (rollback rejected
 ops). Dragging sends `presence.dragging`, which renders as a soft lock for others (teal outline +
@@ -482,7 +488,11 @@ Changed vs Jira: terracotta outline on bars, 3 px inset left bar on cards, dot o
   `apply-log.json`, `.lock`, `AGENTS.md`.
 - On boot: load `state.json` if present; otherwise build state from `snapshot.json`. If the snapshot
   is newer than the state's base, show a "New Jira snapshot available — reload?" prompt instead of
-  auto-merging.
+  auto-merging. `state.json` embeds the snapshot the session is based on, so the changeset and the
+  reload merge still have the right base after `snapshot.json` is replaced while the server is down.
+- Reload merges each core field three ways (base snapshot, new snapshot, roadmap): untouched fields
+  take Jira's new value, Trellis edits are kept, Trellis-owned fields always kept, `NEW-*` ids
+  renamed to real keys from `apply-log.json` (`shared/src/rebase.ts`).
 - Atomic file writes (write temp + rename).
 - Env: `PORT` (8080), `WORKSPACE_DIR` (`./workspace`), `HOST` (`0.0.0.0` for LAN), plus
   `JIRA_SITE`, `JIRA_PROJECT_KEY` (§7). The server only needs

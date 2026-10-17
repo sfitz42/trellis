@@ -7,6 +7,9 @@
     "node": ">=22"
   },
   "scripts": {
+    "dev": "pnpm --filter @trellis/server dev",
+    "build": "tsc -b",
+    "start": "pnpm --filter @trellis/server start",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "lint": "eslint --flag unstable_native_nodejs_ts_config .",

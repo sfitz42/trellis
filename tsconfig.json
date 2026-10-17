@@ -6,6 +6,7 @@
     { "path": "packages/jira" },
     { "path": "packages/cli" },
     { "path": "apps/server" },
+    { "path": "apps/server/test" },
     { "path": "apps/web" }
   ]
 }
