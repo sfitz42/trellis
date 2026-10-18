@@ -66,7 +66,7 @@
       "description": "Sample epic: Notifications service.",
       "status": "To Do",
       "startDate": null,
-      "dueDate": null,
+      "dueDate": "2027-05-31",
       "ticketOrder": [
         "PROJ-160",
         "PROJ-161",

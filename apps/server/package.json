@@ -3,6 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./app": {
+      "types": "./dist/app.d.ts",
+      "development": "./src/app.ts",
+      "default": "./dist/app.js"
+    }
+  },
   "scripts": {
     "typecheck": "tsc -b",
     "dev": "tsx watch --conditions=development --env-file-if-exists=../../.env src/main.ts",

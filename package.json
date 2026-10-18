@@ -16,7 +16,8 @@
     "jira:auth": "pnpm --filter @trellis/jira exec tsx src/discovery/check-auth.ts",
     "jira:discover": "pnpm --filter @trellis/jira exec tsx src/discovery/explore.ts",
     "jira:help-audit": "pnpm --filter @trellis/jira exec tsx src/discovery/help-audit.ts",
-    "jira:fixture": "pnpm --filter @trellis/jira exec tsx src/discovery/make-fixture.ts"
+    "jira:fixture": "pnpm --filter @trellis/jira exec tsx src/discovery/make-fixture.ts",
+    "trellis": "pnpm --silent --filter @trellis/cli trellis"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -28,7 +28,7 @@ const epicDefs: { summary: string; due: string | null; status: Status; tickets: 
   { summary: 'Billing v2', due: '2027-04-30', status: 'To Do', tickets: [
     'Provider sandbox account and keys', 'Checkout payment intent flow', 'Webhook handling and retries',
     'Invoice PDF template', 'Proration rules', 'Refund flow', 'Rounding error on annual plans', 'Tax rate lookup'] },
-  { summary: 'Notifications service', due: null, status: 'To Do', tickets: [
+  { summary: 'Notifications service', due: '2027-05-31', status: 'To Do', tickets: [
     'Notification preferences page', 'Email digest job', 'Push provider integration', 'Template versioning',
     'Unsubscribe link broken in some clients', 'Rate limiting per user'] },
   { summary: 'Admin console', due: '2026-12-31', status: 'In Progress', tickets: [

@@ -1,0 +1,85 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`batch > accepts a bare JSON array, and flags override the input 1`] = `
+{
+  "applied": [
+    {
+      "index": 0,
+      "inverse": [
+        {
+          "id": "PROJ-121",
+          "status": "To Do",
+          "type": "ticket.transition",
+        },
+      ],
+      "op": {
+        "id": "PROJ-121",
+        "status": "Done",
+        "type": "ticket.transition",
+      },
+      "touched": [
+        "PROJ-121.status",
+      ],
+    },
+  ],
+  "batchId": "b1",
+  "rejected": [],
+  "skipped": [],
+  "version": 1,
+}
+`;
+
+exports[`reads > get epic / ticket, auto-detecting the kind 1`] = `
+{
+  "ticket": {
+    "assignee": {
+      "accountId": "acc-0003",
+      "displayName": "Casey Moor",
+    },
+    "epicId": "PROJ-41",
+    "id": "PROJ-121",
+    "issueType": "Task",
+    "labels": [
+      "frontend",
+    ],
+    "links": [
+      {
+        "direction": "outward",
+        "jiraLinkId": "10100",
+        "target": "PROJ-122",
+        "type": "Blocks",
+      },
+      {
+        "direction": "inward",
+        "jiraLinkId": "10101",
+        "target": "PROJ-120",
+        "type": "Blocks",
+      },
+    ],
+    "status": "To Do",
+    "storyPoints": null,
+    "summary": "Backfill job with resumable checkpoints",
+  },
+}
+`;
+
+exports[`reads > status: text and JSON 1`] = `
+{
+  "claims": [],
+  "clients": [],
+  "frozen": null,
+  "pendingChanges": 0,
+  "snapshot": {
+    "epics": 5,
+    "newerAvailable": false,
+    "project": {
+      "key": "PROJ",
+      "name": "Platform Rebuild",
+      "site": "example.atlassian.net",
+    },
+    "pulledAt": "2026-10-01T09:42:00.000Z",
+    "tickets": 36,
+  },
+  "version": 0,
+}
+`;

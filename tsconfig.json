@@ -5,6 +5,7 @@
     { "path": "packages/shared/test" },
     { "path": "packages/jira" },
     { "path": "packages/cli" },
+    { "path": "packages/cli/test" },
     { "path": "apps/server" },
     { "path": "apps/server/test" }
   ]

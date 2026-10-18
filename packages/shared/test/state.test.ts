@@ -12,9 +12,15 @@ describe('fromSnapshot', () => {
     expect(s.frozen).toBeNull();
   });
 
-  it('orders epics by due date, undated last', () => {
+  it('orders epics by due date', () => {
     const s = freshState();
     expect(s.epicOrder).toEqual(['PROJ-40', 'PROJ-44', 'PROJ-41', 'PROJ-42', 'PROJ-43']);
+  });
+
+  it('puts undated epics last', () => {
+    const snap = loadSnapshot();
+    snap.epics['PROJ-40']!.dueDate = null;
+    expect(fromSnapshot(snap, { today: TODAY }).epicOrder).toEqual(['PROJ-44', 'PROJ-41', 'PROJ-42', 'PROJ-43', 'PROJ-40']);
   });
 
   it('repairs ticketOrder to list exactly the epic tickets', () => {

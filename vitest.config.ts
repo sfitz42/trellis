@@ -6,6 +6,7 @@ export default defineConfig({
     projects: [
       { test: { name: 'shared', include: ['packages/shared/test/**/*.test.ts'] } },
       { test: { name: 'server', include: ['apps/server/test/**/*.test.ts'] } },
+      { test: { name: 'cli', include: ['packages/cli/test/**/*.test.ts'] } },
       './apps/web',
     ],
   },

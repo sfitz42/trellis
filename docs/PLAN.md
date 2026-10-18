@@ -396,7 +396,8 @@ The server watches `apply-log.json` to show progress on the Freeze screen.
 
 ## 8. The CLI (`packages/cli`, bin `trellis`)
 
-Config: `TRELLIS_URL` (default `http://localhost:5173` in dev / `:8080` in prod),
+Config: `TRELLIS_URL` (default `http://localhost:8080`: the server listens there in dev and prod;
+`:5173` also works in dev through Vite's proxy),
 `TRELLIS_AGENT_NAME` (default `Claude Code`), `TRELLIS_FACILITATOR` (used as default `--asked-by`).
 Every command supports `--json`; exit codes: 0 ok, 2 partially applied, 3 rejected, 4 frozen,
 5 server unreachable.
@@ -407,16 +408,18 @@ trellis get [epic|ticket] <id>                   # read
 trellis list epics | tickets [--epic ID] [--filter text]
 trellis snapshot-diff [<id>]                      # how an item differs from Jira
 trellis claim <ids…> [--note …] [--ttl 5m]        # soft lock + presence; release <ids…>
-trellis epic create|update|dates|transition …
+trellis epic create|update|dates|transition|reorder …   # dates: --start/--due or --shift 1m|-2w|1q
 trellis ticket create|update|move|transition|discard …
 trellis link add|remove <from> blocks <to>
 trellis batch [--base N] [--reason "…"] [--asked-by NAME] [--non-atomic] < ops.json
 trellis undo <batchId>
-trellis watch [--json]                           # stream batches/presence (websocket)
+trellis watch [--json] [--limit N]               # stream batches/presence; --limit 1 = wait for next change
 trellis freeze | unfreeze | changeset
 ```
 
-Single-op commands are sugar over `POST /api/batch`. All agent writes carry `author.kind = 'agent'`
+Run it in the repo as `pnpm -s trellis …` (pnpm echoes the script to stderr; stdout stays clean for
+`--json`). Writes resolve `--assignee` by account id, name or a unique name prefix from the people
+on tickets. Single-op commands are sugar over `POST /api/batch`. All agent writes carry `author.kind = 'agent'`
 plus `reason`/`askedBy` when given. A CLI that issues writes registers presence as an agent client
 (shown with the plum treatment) for as long as it has an active claim or watch.
 

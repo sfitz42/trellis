@@ -274,6 +274,22 @@ importers:
       '@trellis/shared':
         specifier: workspace:*
         version: link:../shared
+      commander:
+        specifier: 15.0.0
+        version: 15.0.0
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@trellis/server':
+        specifier: workspace:*
+        version: link:../../apps/server
+      '@types/ws':
+        specifier: 8.18.2
+        version: 8.18.2
+      ws:
+        specifier: 8.22.0
+        version: 8.22.0
 
   packages/jira:
     dependencies:
@@ -856,6 +872,10 @@ packages:
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
     engines: {node: '>=6'}
+
+  commander@15.0.0:
+    resolution: {integrity: sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg==}
+    engines: {node: '>=22.12.0'}
 
   content-disposition@3.0.0:
     resolution: {integrity: sha512-ZH/0Xs9rMIFWCOmGdmS9eHBTF62qqQYNz4nVjQhkdIO/a0fCP4UIM3mRz/wiqL0L14YgAz/1xio4OaSY4+ON/A==}
@@ -2172,6 +2192,8 @@ snapshots:
       readdirp: 4.1.2
 
   clsx@2.1.1: {}
+
+  commander@15.0.0: {}
 
   content-disposition@3.0.0: {}
 
