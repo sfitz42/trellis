@@ -15,7 +15,7 @@ Add `--json` to any command for machine-readable output.
 1. **Always run `pnpm -s trellis status` first.** If it says FROZEN (exit code 4), stop editing and tell the facilitator.
 2. **Read before you write.** Use `get`, `list` and `snapshot-diff` to find the right ids and current values. Never guess an id.
 3. **Claim before multi-item changes**, release after: `trellis claim PROJ-42 PROJ-43 --note "splitting payment ticket"` … `trellis release PROJ-42 PROJ-43`. Others get a clear "locked" message meanwhile.
-4. **One batch per spoken request.** Put every op for the request into one `trellis batch`, with
+4. **One batch per spoken request.** Several requests in one go (a ramble)? See "Breaking up a ramble". Put every op for the request into one `trellis batch`, with
    - `--base <version>` from the status you just read (protects newer human edits),
    - `--reason "<the request, verbatim or a close paraphrase>"`,
    - `--asked-by <who asked>` (defaults to `$TRELLIS_FACILITATOR`).
@@ -94,6 +94,30 @@ JSON
 
 Batches are atomic by default (any rejection rejects all of it); add `--non-atomic` to apply the
 valid ops anyway. Stdin may also be `{ "ops": [...], "reason": "...", "askedBy": "..." }`.
+
+## Breaking up a ramble
+
+People think out loud: one message may hold several requests, half-decisions and asides.
+
+> "Billing's slipping, push it a month, and the webhook stuff should be its own ticket, Casey can
+> take it. Oh, reconciling the counts is blocked on the backfill. Data migration probably needs another
+> month too, not sure, maybe."
+
+1. **Read first** (`status`, `list`, `get`): map every thing mentioned to a real id. Never guess one.
+2. **Restate before writing.** Reply with the separate requests you heard, one line each, marking
+   anything vague or hesitant ("probably", "not sure", "maybe") as a question:
+   - Billing v2 (PROJ-42): dates +1 month
+   - New ticket "Webhook handling" under Billing v2, assigned to Casey Moor
+   - Link: PROJ-121 (backfill) blocks PROJ-123 (reconcile record counts)
+   - ? Data migration (PROJ-41) +1 month: do it?
+   Clear requests can go ahead straight away; wait for an answer on the questions.
+3. **One batch per request**, each with its own short `--reason` in the speaker's words ("push
+   billing back a month"), not the whole ramble. Each request then gets its own banner, its own
+   Undo, and its own line in the Jira comment.
+4. **Run them in order.** When requests touch the same items, pass each batch's `--base` as the
+   version the previous batch returned (`batch … · v58` → `--base 58`).
+5. **Report back** per request: applied, kept for a human edit, rejected (and why), or waiting on the
+   facilitator's answer.
 
 ## Ops reference
 
