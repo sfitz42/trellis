@@ -34,7 +34,8 @@ tickets are configured. So:
 | `status` | `fields.status.name`, `fields.status.statusCategory.key` | Done-ness by category. |
 | `epicId` | `fields.parent.key` | Works for team-managed and current company-managed Cloud projects. Seen shape: `{id,key,self,fields}`. |
 | `assignee` | `fields.assignee.accountId` / `.displayName` | Can be `null`. |
-| `labels` | `fields.labels` | |
+| `labels` | `fields.labels` | Without `deliver-later`, which is read as `deferred` (next row). |
+| `deferred` (epics and tickets) | `fields.labels` contains `deliver-later` | Read on pull for epics too (Trellis epics have no other labels). Written by apply with `edit --labels` / `--remove-labels`, `create --label`. |
 | `links` | `fields.issuelinks[]`: `type.name`, `outwardIssue.key` or `inwardIssue.key`, `id` | Keep the link `id`: delete needs it. |
 | Epic `dueDate` | `fields.duedate` | Read on pull; set on create. Afterwards Trellis-owned (acli can't edit it): changes go to Jira as comments. |
 
@@ -145,3 +146,17 @@ All commands are run with `execFile` (no shell). "JSON" means the command has a 
 **Verified end to end on the sandbox (2026-10-18):** pull → edit (one batch with every change type)
 → freeze → dry run → `--yes` (3 creates, field edits, a transition, link add and remove, 9 comments)
 → pull → changeset empty → unfreeze.
+
+## Milestones and Deliver later (`docs/plans/milestones.md`)
+
+| Topic | Decision |
+|---|---|
+| Milestones | Trellis only (`roadmap.json` / `state.json`); never written to Jira. |
+| Deferral | The label `deliver-later` (`LATER_LABEL` in `packages/jira/src/normalize.ts`; a constant, not configurable, until a project needs another name). Checked from `acli … edit --help` / `create --help` only: `--labels`, `--remove-labels`, `--label`. |
+| Pull | The label sets `deferred` on epics and tickets and is left out of `labels`, so label edits, label drift and the changeset never see it. A deferred epic has no dates in Trellis; Jira's due date is kept as what Jira was told. |
+| Apply | A `defer` change (ordered after transitions, before epic dates) is an `edit` adding or removing the label, skipped when Jira already has it, plus a note in the issue's one comment: "Moved to Deliver later on the roadmap …" (for an epic: its planned dates are cleared in Trellis and Jira's due date field is unchanged, as acli can't clear it), or "Scheduled again …". A deferred epic's cleared dates are not posted as a separate dates note. |
+| Re-pull | `deferred` merges three ways like other core fields. An epic deferred in Jira loses its roadmap dates. |
+
+**Verified on the sandbox (2026-10-18):** defer an epic (NAI-9) and a ticket (NAI-6) in one agent
+batch → freeze → dry run (2 label edits, 2 comments) → `--yes` → pull → changeset empty, both still
+deferred, labels and comments (with the captured request) in Jira.

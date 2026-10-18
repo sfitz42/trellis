@@ -19,6 +19,7 @@ real-time editor, a CLI, and a pair of Jira scripts.
 | **Design screens** | [Trellis Screens canvas](https://claude.ai/artifact/Tc86u1GSQqM1Y6pPLUTWuz) · exported to `docs/design/*.png` | The visual reference for §9. |
 | **This plan** | `docs/PLAN.md` | The how: architecture, schemas, protocol, phases. |
 | **Kickoff prompts** | `docs/KICKOFF_PROMPT.md` | The prompt that starts Phase 0, and the prompts for later phases. |
+| **Change plans** | `docs/plans/*.md` | Changes made after the phases below, with their decisions. `milestones.md`: the Milestones scale and Deliver later (done; folded into this plan). |
 
 The links are for people; they are private until shared. Agents can't open them, so they work
 from the exported copies in `docs/`. If the brief and this plan disagree, **this plan wins** for
@@ -30,8 +31,9 @@ than picking silently. When a decision changes, update both.
 ## 1. Goals and non-goals
 
 ### Goals
-- Visual roadmap: epics as bars on a configurable time axis (months by default; quarters, weeks or
-  custom ranges). **Not tied to sprints.**
+- Visual roadmap: epics as bars on a configurable time axis. The default is the **Milestones** scale
+  (weeks up to the delivery dates, then a **Deliver later** tray for work that won't make them);
+  weeks, months, quarters or custom ranges are also available. **Not tied to sprints.**
 - Real-time collaboration for a handful of people on a LAN, via websockets.
 - The facilitator's agent can read and edit the live roadmap through a CLI, and every agent batch
   records the natural-language request that caused it.
@@ -178,6 +180,7 @@ interface Epic {
   dueDate: string | null;            // set in Jira on create; afterwards Trellis-owned (changes go to Jira as comments)
   ticketOrder: IssueId[];            // display order of child tickets
   color?: string;                    // optional token name for the bar
+  deferred: boolean;                 // in Deliver later (Jira: the `deliver-later` label); a deferred epic has no dates
 }
 
 interface Ticket {
@@ -191,6 +194,7 @@ interface Ticket {
   labels: string[];
   storyPoints: number | null;        // Trellis-owned, like Epic.startDate
   links: Link[];
+  deferred: boolean;                 // deferred on its own (its epic may stay scheduled); same label in Jira
 }
 
 interface RoadmapState {
@@ -205,11 +209,16 @@ interface RoadmapState {
   frozen: null | { by: string; at: string };
 }
 
+interface Milestone { id: string; label: string; date: string }  // work lands on or before `date`; Trellis only
+
 interface TimelineConfig {
-  scale: 'weeks' | 'months' | 'quarters' | 'custom';
+  scale: 'milestones' | 'weeks' | 'months' | 'quarters' | 'custom';  // new sessions: 'milestones'
   start: string;                     // first visible date
-  end: string;                       // last visible date
+  end: string;                       // last visible date (the milestones scale ends at the last milestone instead)
   customRanges?: { label: string; start: string; end: string }[];
+  milestones: Milestone[];           // sorted by date; may be empty (default [])
+  showLater: boolean;                // show the Deliver later tray (default true)
+  laterLabel: string;                // the tray's display name (default "Deliver later")
 }
 ```
 
@@ -221,7 +230,16 @@ interface TimelineConfig {
 - `roadmap.json` = `RoadmapState` without `meta`, pretty-printed with **stable key order** (sorted
   keys, epics/tickets sorted by id). Written by the server only, debounced (~500 ms) after changes.
 - Timeline columns are **display only**. Epics store real dates; changing the scale never changes
-  data. Dragging snaps to the current scale unit (month boundaries in month view, etc.).
+  data. Dragging snaps to the current scale unit (month boundaries in month view, weeks in the
+  milestones scale, etc.).
+- **Milestones and Deliver later.** The milestones scale shows one column per week (w/c Monday) from
+  `start` to the last milestone (to `end` when there are none; new sessions show 8 weeks from this
+  Monday). A milestone's line sits at the start of its day; an epic makes it when
+  `dueDate <= milestone.date`. A ticket is **later** when it or its epic is deferred. Scope counts
+  and warnings (`scopeSummary`, `scopeWarnings` in `packages/shared/src/scope.ts`) work from epic
+  dates, as tickets have none: an epic due after the milestone it works towards, an in-scope ticket
+  blocked by a later one, and a blocker whose epic is due in the last 7 days before the milestone.
+- Older `state.json` / `roadmap.json` / `snapshot.json` files load: the new fields have defaults.
 
 ---
 
@@ -237,14 +255,16 @@ type Op =
   | { type: 'epic.transition'; id: IssueId; status: string }
   | { type: 'epic.reorder';    id: IssueId; index: number }
   | { type: 'epic.discardNew'; id: IssueId }          // only for empty NEW-* epics (makes epic.create undoable)
+  | { type: 'epic.defer';      id: IssueId; deferred: boolean }  // true clears its dates (undo restores them); tickets' own flags untouched
   | { type: 'ticket.create';   tempId?: IssueId; epicId: IssueId | null; fields: Partial<Ticket> & { summary: string } }
   | { type: 'ticket.update';   id: IssueId; fields: Partial<Pick<Ticket,'summary'|'description'|'assignee'|'labels'|'storyPoints'|'issueType'>> }
   | { type: 'ticket.move';     id: IssueId; epicId: IssueId | null; index?: number }
   | { type: 'ticket.transition'; id: IssueId; status: string }
   | { type: 'ticket.discardNew'; id: IssueId }          // only for NEW-* items
+  | { type: 'ticket.defer';    id: IssueId; deferred: boolean }
   | { type: 'link.add';        from: IssueId; to: IssueId; linkType: 'blocks' }
   | { type: 'link.remove';     from: IssueId; to: IssueId; linkType: 'blocks' }
-  | { type: 'timeline.set';    timeline: TimelineConfig };
+  | { type: 'timeline.set';    timeline: TimelineConfig };  // also how milestones are added, moved and removed
 
 interface Batch {
   id: string;                         // server-assigned
@@ -260,7 +280,9 @@ interface Batch {
 ### Server handling of a batch
 1. Reject everything if `state.frozen` (error `FROZEN`).
 2. Validate each op with zod, then semantically: ids exist, epic exists, status is a valid
-   transition target from `snapshot.workflow`, no link cycles to self, dates `start <= due`, etc.
+   transition target from `snapshot.workflow`, no link cycles to self, dates `start <= due`, no
+   dates on a deferred epic (`DEFERRED`: undefer first, in the same batch), unique milestone ids, etc.
+   Deferring something already deferred is a no-op.
 3. **Conflict check (field-level last-writer-wins with protection):** if `baseVersion` is given and a
    field the op touches has `meta.version > baseVersion` **and** a different author, that op is
    **skipped** with reason `STALE_FIELD` ("PROJ-127 summary edited by James at v59"). Human browser
@@ -324,8 +346,11 @@ ops). Dragging sends `presence.dragging`, which renders as a soft lock for other
 1. **Freeze** (button or `trellis freeze`): server sets `frozen`, rejects all batches, writes
    `workspace/.lock`, computes and writes `workspace/changeset.json`.
 2. **Changeset** = diff(snapshot, roadmap), ordered so dependencies resolve:
-   epic.create → ticket.create → moves (parent) → field updates → transitions → epic dates →
-   link.add → link.remove.
+   epic.create → ticket.create → moves (parent) → field updates → transitions → defer/undefer →
+   epic dates → link.add → link.remove.
+   Deferral is a core field (the `deliver-later` label), diffed against the snapshot and merged
+   three ways on re-pull. A deferred epic's cleared dates are not a separate dates change; its defer
+   note says so.
    Each op carries `before` (snapshot value) and `after`, plus `reasons`: the `reason`/`askedBy` of
    every agent batch that touched that item (posted as Jira comments). Epic dates and epic moves of
    existing tickets are **comment-only** (acli can't edit due date or parent): compared with
@@ -390,6 +415,10 @@ The server watches `apply-log.json` to show progress on the Freeze screen.
   issue type at hierarchy level 1, children via `parent`, link type `Blocks`, done-ness by status
   category. Start date and story points are **Trellis-owned** (kept in Trellis state, excluded from
   the changeset, preserved across re-pulls). No `config.json`: nothing project-specific is hard-coded.
+- **Deliver later = the `deliver-later` label** (`LATER_LABEL` in `packages/jira/src/normalize.ts`).
+  Pull reads it as `deferred` and leaves it out of `labels`; apply adds or removes it and posts a note
+  in the issue's one comment ("Moved to Deliver later …" / "Scheduled again …"). Milestones never
+  reach Jira.
 - If the CLI cannot do something (e.g. links or a custom field), stop and report it. Do not silently
   switch to raw REST; the facilitator decides.
 - Descriptions: Jira Cloud uses ADF. v1 converts ADF ↔ plain text/markdown for display and only
@@ -414,8 +443,10 @@ trellis get [epic|ticket] <id>                   # read
 trellis list epics | tickets [--epic ID] [--filter text]
 trellis snapshot-diff [<id>]                      # how an item differs from Jira
 trellis claim <ids…> [--note …] [--ttl 5m]        # soft lock + presence; release <ids…>
-trellis epic create|update|dates|transition|reorder …   # dates: --start/--due or --shift 1m|-2w|1q
-trellis ticket create|update|move|transition|discard …
+trellis epic create|update|dates|transition|reorder|defer|undefer …   # dates: --start/--due or --shift 1m|-2w|1q; undefer takes --start/--due
+trellis ticket create|update|move|transition|discard|defer|undefer …
+trellis milestone list | add <label> <date> | set <id> <date> [--label …] | remove <id>
+trellis scope [--milestone ID]                   # by the milestone vs Deliver later, with warnings
 trellis link add|remove <from> blocks <to>
 trellis batch [--base N] [--reason "…"] [--asked-by NAME] [--non-atomic] < ops.json
 trellis undo <batchId>
@@ -435,6 +466,8 @@ plus `reason`/`askedBy` when given. A CLI that issues writes registers presence 
 - Prefer one `batch` per spoken request, with `--base`, `--reason` (the request verbatim or close
   paraphrase) and `--asked-by`.
 - On `STALE_FIELD`, re-read and ask the facilitator rather than forcing.
+- "X won't make 9 Nov, put it in deliver later" is one batch (`epic.defer` / `ticket.defer`) with
+  `--reason` and `--asked-by`; report `trellis scope` afterwards.
 - Never edit files in `workspace/` directly. Never run `jira:apply --yes` without the facilitator
   confirming the dry-run output in chat.
 
@@ -447,24 +480,38 @@ them as the visual reference; `docs/brief.md` describes each screen's key moment
 meanings):
 
 1. **Live session (timeline)** — top bar (project, snapshot info, live pill, avatars, "Changes vs
-   Jira" count, "Freeze for apply"); toolbar (Timeline/Changes/Activity view toggle, Scale select,
-   From date, filter, + Ticket, + Epic); timeline grid with a sticky header, 250 px epic label
-   column, epic bars (drag to move, drag edges to resize, snap to scale), expandable rows of ticket
-   cards (drag between epics/reorder), ochre "now" column; right rail activity feed + workspace info.
+   Jira" count, "Freeze for apply"); toolbar (Timeline/Changes/Activity view toggle, Scale select
+   with Milestones first, a chip per milestone ("◆ Delivery · 9 Nov") opening an edit popover for
+   label and date, "+ Milestone", "Show Deliver later", From date, filter, scope chips
+   "By 9 Nov · 3 epics · 23 tickets" / "Later · 2 epics · 15 tickets", + Ticket, + Epic); timeline
+   grid with a sticky header, 250 px epic label column, epic bars (drag to move, drag edges to
+   resize, snap to scale; "8 + 1 later" when tickets are deferred), expandable rows of ticket cards
+   (drag between epics/reorder). In the milestones scale: week columns ("w/c 19 Oct", "this week"
+   tinted), a 3 px ochre line at each milestone with a "◆ 9 Nov" header tag (lines show in every
+   scale; bars stop at the last line and show a dashed end when they run on), then a 20 px gutter
+   and the hatched **Deliver later** tray (tray icon, "no date · after Delivery", not to scale):
+   deferred epics as compact bars, tickets deferred on their own as cards on their epic's row
+   ("Deferred by James"). Dragging a bar or card into the tray defers it; dragging out schedules
+   it (an epic from the dropped week, keeping its earlier length). Other scales keep the ochre "now"
+   column. Right rail activity feed + workspace info.
 2. **Ticket detail** — right-hand panel: summary, epic, status (valid transitions only), assignee,
    story points, labels, description, dependencies (add/remove), "Differs from Jira" box with
    per-field revert. Left: epic header (dates vs Jira dates) and dependency chain with a warning
-   when a dependency points backwards in time. Shows who else is viewing.
+   when a dependency points backwards in time. Shows who else is viewing. Deferred tickets carry a
+   "Deliver later" tag with the tray icon; "Move to Deliver later" / "Schedule again" on the ticket
+   and the epic header; milestone and deferral warnings for the epic and the ticket.
 3. **Agent batch** — plum banner when an agent batch lands ("Claude Code applied batch #3 · asked
    by Shaun"), items it touched get plum dotted outlines for ~30 s, side panel with the captured
    request, results (applied / rejected / kept human edit) and the CLI command summary, Undo batch.
 4. **Freeze & apply** — locked header, 5-step progress (Frozen → Changeset written → Waiting for
    agent → Re-pull → Unfrozen), drift conflicts with Keep/Overwrite, changeset table (operation,
-   target, change, by), hand-off panel (files, commands, live apply log, Copy agent prompt).
+   target, change, by; deferral is a **Defer** row), hand-off panel (files, commands, live apply
+   log, Copy agent prompt).
 
 Accessibility: real buttons/inputs/labels, keyboard move for bars and cards (arrow keys shift by one
-scale unit; Enter opens detail), 44 px touch targets, visible focus, colour never the only signal
-(tags/labels accompany every colour state).
+scale unit; Enter opens detail; **L** moves a bar or card to Deliver later and back; a "Schedule"
+button on tray bars shows on focus), 44 px touch targets, visible focus, colour never the only signal
+(tags/labels accompany every colour state; every deferred item has the tray icon or the label).
 
 ---
 
@@ -485,7 +532,11 @@ accents. Fonts: **IBM Plex Sans** (UI), **IBM Plex Mono** (keys, code).
 | `--people` | `#3E6A70` / tint `#D3E2E1` / text `#2C4E53` | presence, selection, soft locks |
 | `--changed` | `#B97A58` (outline), `#CB997E` (border) / tint `#F8E3D4` / text `#7A4A2E` | differs from Jira |
 | `--agent` | `#8E6C8A` (outline), `#7D5A79` (solid, white text) / tint `#EADFE8` / text `#5A3D57` | agent changes, dotted outline |
-| `--warn` | `#C9963A` / tint `#F5E6C4` / text `#6B4E14` | now marker, warnings, drift |
+| `--warn` | `#C9963A` / tint `#F5E6C4` / text `#6B4E14` | now marker (non-milestone scales), warnings, drift |
+| `--milestone` | `#C9963A` | 3 px milestone lines, header tags, milestone chip |
+| `--this-week` | `#FAF1E7` | current week in the milestones scale |
+| `--later-tint` / `--later-ink` | `#EFE3D6` / `#464A3B` | Deliver later: Defer op tag, tray header, "Deliver later" tags |
+| `--later-hatch` | `#F6EADF` / `#FBF3EA` stripes at 135° | the Deliver later tray background |
 | `--error` | `#9E4436` / tint `#F3D8D2` / text `#7E3226` | rejected, errors |
 | Epic fills | `#DDBEA9`, `#D3E2E1`, `#F1D3C0`, `#EADFE8`, `#F5E6C4` | rotate per epic, dark text of same hue |
 

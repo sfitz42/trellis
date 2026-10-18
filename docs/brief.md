@@ -31,7 +31,8 @@ Everything before Freeze happens only in Trellis; Jira changes once, in the Appl
 | Who runs the agent | Whoever is facilitating; no request box in the app for now | Keeps the app simple and agent-free |
 | Captured requests | Every agent batch stores the request in plain words and who asked | We keep a record of why things changed |
 | Jira comments | Every changed issue gets one comment with the captured requests and who asked | The record of why things changed lives in Jira too |
-| Time axis | Configurable scale (months by default; quarters, weeks or custom), not sprints | We don't work to sprints; epics store real dates |
+| Time axis | Configurable scale, not sprints. The default is **Milestones**: weeks up to our delivery dates (e.g. 9 Nov), then a **Deliver later** tray; weeks, months, quarters or custom also available | We don't work to sprints; epics store real dates; the room needs to see what's in, what's out, and whether it fits before the date |
+| Deliver later | Epics or single tickets can be deferred; Jira gets a `deliver-later` label and a comment. Milestones stay in Trellis | Pushed-out work stays visible and counted, and Jira shows it too without needing new fields |
 | Jira mapping | Timeline = epic start and due dates, owned by Trellis (date changes reach Jira as comments); Jira Cloud, team- or company-managed | Matches how our project is set up; the Atlassian CLI can't edit due dates or a ticket's epic |
 | Jira access | Scripts wrap the facilitator's Atlassian CLI; Jira changes only through freeze, dry run and apply | One login; what the room agreed is exactly what reaches Jira |
 | Safety | Dry run first, drift check, resumable apply; never deletes issues; an explicit project confirmation on every apply | Nothing reaches Jira by accident |
@@ -45,7 +46,7 @@ The four key screens are on the [Trellis Screens design canvas](https://claude.a
 
 | Screen | What it shows | Key moments |
 | --- | --- | --- |
-| 1 · Live roadmap session | Epics as bars across months, an expanded epic with its ticket cards, an activity feed | Who's in the session, a soft lock while someone drags, the count of changes vs Jira |
+| 1 · Live roadmap session | Epics as bars across the weeks to the 9 Nov delivery, the Deliver later tray, an expanded epic with its ticket cards, an activity feed | Who's in the session, a soft lock while someone drags, the count of changes vs Jira, what makes 9 Nov and what's later |
 | 2 · Ticket detail and dependencies | An editing panel beside the epic, with the dependency chain | Fields that differ from Jira, revert to Jira values, a warning when a dependency runs backwards in time |
 | 3 · Facilitator's agent applies a batch | A banner and side panel when the agent's changes land | The request in the facilitator's words, what was applied, kept or rejected, the CLI commands, undo |
 | 4 · Freeze and apply | The locked session and the changeset ready for Jira | Five-step progress, a drift conflict to resolve, the hand-off panel with files, commands and apply log |
@@ -62,7 +63,8 @@ Each colour means one thing, so a glance tells you who changed what. The base is
 | Teal | `#3E6A70` | People: presence, selection, soft locks |
 | Terracotta | `#CB997E` | Differs from the Jira snapshot (outlines #B97A58, borders #CB997E) |
 | Plum | `#8E6C8A`, dotted outline | Changed by the facilitator's agent |
-| Ochre | `#C9963A` | Now marker, warnings, drift |
+| Ochre | `#C9963A` | Milestones, now marker (other scales), warnings, drift |
+| Stone | `#EFE3D6` with ink `#464A3B`, hatched tray | Deliver later (always with the tray icon or the label) |
 | Brick | `#9E4436` | Errors and rejected edits |
 
 A dashed border marks a new item that only exists in Trellis so far. Full-strength colours are only for small marks; large areas use light tints.
@@ -94,6 +96,8 @@ Claude Code builds Trellis in seven phases, stopping for review after each. The 
 7. **Phase 6 · Packaging.** Dockerfile, Docker Compose, README and the facilitator runbook.
 
 All seven phases are built. Phase 5 was verified end to end against the sandbox Jira project: pull, edit, freeze, dry run, apply, re-pull, empty changeset.
+
+Since then: the Milestones scale and Deliver later (`docs/plans/milestones.md`), also verified on the sandbox.
 
 ## Open questions and next steps
 

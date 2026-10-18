@@ -1,6 +1,6 @@
 # Trellis change plan: Milestones scale and Deliver later
 
-_Status: in progress (M0 approved) · 18 Oct 2026_
+_Status: **Done** · 18 Oct 2026 · folded into `docs/PLAN.md` and `docs/jira-mapping.md`_
 
 ## Why
 
@@ -161,7 +161,7 @@ Stop for review after each phase. Each one ends with `pnpm typecheck`, `pnpm lin
 - ✅ Done when the full loop on the sandbox project (defer, freeze, dry run, apply, re-pull) leaves
   an empty changeset with deferral preserved. Show the dry run before any `--yes`.
 
-**M5 · Docs**
+**M5 · Docs** ✅ done 18 Oct 2026
 - Fold this change into `docs/PLAN.md`: data model, ops, CLI, Jira mapping, the §9 screen 1
   description, §10 tokens.
 - Update `docs/jira-mapping.md` and `docs/brief.md`.

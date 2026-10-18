@@ -88,7 +88,9 @@ Before the session:
 
 1. `pnpm jira:auth`: checks `acli` is logged in to `JIRA_SITE`.
 2. `pnpm jira:pull`: writes `workspace/snapshot.json` from Jira (read-only).
-3. Start Trellis (`pnpm docker:up`, or `pnpm dev`) and share the URL with the room.
+3. Start Trellis (`pnpm docker:up`, or `pnpm dev`) and share the URL with the room. Add your
+   delivery date with **+ Milestone** (or `pnpm -s trellis milestone add Delivery 2026-11-09`): the
+   default Milestones scale shows the weeks up to it, then the **Deliver later** tray.
 4. Open your agent (Claude Code or Copilot) in this repo. It reads `AGENTS.md` / the `trellis` skill.
 
 During the session:
@@ -96,7 +98,9 @@ During the session:
 5. People edit in the browser; you ask your agent for bigger changes ("split PROJ-140 into three
    tickets and push Notifications back a month"). Each agent batch shows a plum banner with the
    request, what was applied, kept or rejected, and an **Undo**.
-6. **Changes vs Jira** in the top bar shows what will change.
+6. **Changes vs Jira** in the top bar shows what will change. The **By 9 Nov** / **Later** chips show
+   what makes the milestone; drag work into the tray (or ask: "Notifications won't make 9 Nov, put
+   it in deliver later"). In Jira, deferred items get a `deliver-later` label and a comment.
 
 At the end:
 
