@@ -16,7 +16,7 @@
   },
   "scripts": {
     "typecheck": "tsc -b",
-    "dev": "tsx watch --conditions=development --env-file-if-exists=../../.env src/main.ts",
+    "dev": "STATIC_DIR= tsx watch --conditions=development --env-file-if-exists=../../.env src/main.ts",
     "start": "node --env-file-if-exists=../../.env dist/main.js"
   },
   "dependencies": {

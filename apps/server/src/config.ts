@@ -8,7 +8,7 @@ export interface ServerConfig {
   projectKey: string | undefined;
   /** Poll files instead of fs.watch (Docker Desktop bind mounts on macOS/Windows). */
   watchPoll: boolean;
-  /** Built SPA to serve (apps/web/dist). Skipped if the folder doesn't exist (e.g. in dev). */
+  /** Built SPA to serve (apps/web/dist). Skipped if empty (`pnpm dev` sets STATIC_DIR= so a stale build never shadows Vite) or missing. */
   staticDir: string;
 }
 

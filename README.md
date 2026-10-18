@@ -51,6 +51,9 @@ pnpm seed          # sample project (invented data); or `pnpm jira:pull` for you
 pnpm dev           # server on :8080, web app on http://localhost:5173 (proxies /api and /ws)
 ```
 
+In dev, open :5173 (or `http://<this machine>:5173` for the room). The dev server serves only the
+API on :8080, so an old `pnpm build` can't show an out-of-date app there.
+
 Open the app in two browser windows with different names and edit in one: the other updates live.
 Try the agent side from a terminal:
 

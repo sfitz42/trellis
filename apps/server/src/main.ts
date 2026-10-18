@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { buildApp } from './app.js';
@@ -14,6 +15,7 @@ const { app, close } = await buildApp({
 
 await app.listen({ port: config.port, host: config.host });
 app.log.info(`workspace: ${config.workspaceDir}`);
+app.log.info(config.staticDir && existsSync(config.staticDir) ? `web app: ${config.staticDir}` : 'web app: not served here (in dev, open Vite on :5173)');
 
 // Tells `pnpm session:new/restore` that a server is using THIS workspace (they probe the port;
 // a file left behind by a crash is ignored because nothing answers there).
