@@ -4,7 +4,7 @@
 import { hashString } from './hash.js';
 import type { Epic, IssueId, OplogEntry, Person, RoadmapState, Snapshot, Ticket } from './schemas.js';
 import { isTempId } from './schemas.js';
-import { compareIds, initialStatus } from './state.js';
+import { acknowledgedDates, compareIds, epicKey, initialStatus } from './state.js';
 
 export interface Reason {
   batchId: string;
@@ -22,12 +22,13 @@ interface Base {
 
 export type ChangeOp = Base &
   (
-    | { kind: 'epic.create'; after: { summary: string; description?: string; status: string; dueDate: string | null } }
+    | { kind: 'epic.create'; after: { summary: string; description?: string; status: string; startDate: string | null; dueDate: string | null } }
     | { kind: 'ticket.create'; after: { summary: string; issueType: string; epicId: IssueId | null; description?: string; status: string; assignee: Person | null; labels: string[] } }
     | { kind: 'ticket.move'; before: IssueId | null; after: IssueId | null }
     | { kind: 'field.update'; field: 'summary' | 'description' | 'assignee' | 'labels' | 'issueType'; before: unknown; after: unknown }
     | { kind: 'transition'; before: string | null; after: string }
-    | { kind: 'epic.dueDate'; before: string | null; after: string | null }
+    /** Comment-only: Trellis owns epic dates; Jira is told via a comment (acli can't edit due dates). */
+    | { kind: 'epic.dates'; before: { startDate: string | null; dueDate: string | null }; after: { startDate: string | null; dueDate: string | null } }
     | { kind: 'link.add'; linkType: string; to: IssueId }
     | { kind: 'link.remove'; linkType: string; to: IssueId; jiraLinkId?: string }
   );
@@ -44,7 +45,10 @@ export interface Changeset {
   ops: (ChangeOp & { index: number })[];
 }
 
-const ORDER: ChangeKind[] = ['epic.create', 'ticket.create', 'ticket.move', 'field.update', 'transition', 'epic.dueDate', 'link.add', 'link.remove'];
+const ORDER: ChangeKind[] = ['epic.create', 'ticket.create', 'ticket.move', 'field.update', 'transition', 'epic.dates', 'link.add', 'link.remove'];
+
+/** Changes acli can't make on existing issues: apply posts them as comments (docs/jira-mapping.md). */
+export const COMMENT_ONLY: ReadonlySet<ChangeKind> = new Set<ChangeKind>(['ticket.move', 'epic.dates']);
 
 const text = (s: string | undefined): string => s ?? '';
 const sameLabels = (a: string[], b: string[]): boolean => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
@@ -106,7 +110,7 @@ export function computeChangeset(snapshot: Snapshot, state: RoadmapState, oplog:
     const before: Epic | undefined = snapshot.epics[e.id];
     if (!before) {
       if (!isTempId(e.id)) continue; // not in this snapshot and not ours: nothing we can do
-      const after: { summary: string; description?: string; status: string; dueDate: string | null } = { summary: e.summary, status: e.status, dueDate: e.dueDate };
+      const after: Extract<ChangeOp, { kind: 'epic.create' }>['after'] = { summary: e.summary, status: e.status, startDate: e.startDate, dueDate: e.dueDate };
       if (e.description) after.description = e.description;
       push({ kind: 'epic.create', target: e.id, after });
       if (e.status !== initialStatus(snapshot.workflow, epicType)) push({ kind: 'transition', target: e.id, before: null, after: e.status });
@@ -115,7 +119,11 @@ export function computeChangeset(snapshot: Snapshot, state: RoadmapState, oplog:
     if (e.summary !== before.summary) push({ kind: 'field.update', target: e.id, field: 'summary', before: before.summary, after: e.summary });
     if (text(e.description) !== text(before.description)) push({ kind: 'field.update', target: e.id, field: 'description', before: text(before.description), after: text(e.description) });
     if (e.status !== before.status) push({ kind: 'transition', target: e.id, before: before.status, after: e.status });
-    if (e.dueDate !== before.dueDate) push({ kind: 'epic.dueDate', target: e.id, before: before.dueDate, after: e.dueDate });
+    // Dates are Trellis-owned: a change is relative to what Jira was last told, not the snapshot.
+    const told = acknowledgedDates(state, e.id) ?? { startDate: before.startDate, dueDate: before.dueDate };
+    if (e.startDate !== told.startDate || e.dueDate !== told.dueDate) {
+      push({ kind: 'epic.dates', target: e.id, before: told, after: { startDate: e.startDate, dueDate: e.dueDate } });
+    }
   }
 
   // Tickets
@@ -131,7 +139,8 @@ export function computeChangeset(snapshot: Snapshot, state: RoadmapState, oplog:
       if (t.status !== initialStatus(snapshot.workflow, t.issueType)) push({ kind: 'transition', target: t.id, before: null, after: t.status });
       continue;
     }
-    if (t.epicId !== before.epicId) push({ kind: 'ticket.move', target: t.id, before: before.epicId, after: t.epicId });
+    const toldEpic = state.acknowledged[epicKey(t.id)];
+    if (t.epicId !== before.epicId && toldEpic !== t.epicId) push({ kind: 'ticket.move', target: t.id, before: before.epicId, after: t.epicId });
     if (t.summary !== before.summary) push({ kind: 'field.update', target: t.id, field: 'summary', before: before.summary, after: t.summary });
     if (text(t.description) !== text(before.description)) push({ kind: 'field.update', target: t.id, field: 'description', before: text(before.description), after: text(t.description) });
     if (!sameAssignee(t.assignee, before.assignee)) push({ kind: 'field.update', target: t.id, field: 'assignee', before: before.assignee, after: t.assignee });

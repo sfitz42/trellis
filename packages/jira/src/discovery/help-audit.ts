@@ -1,7 +1,7 @@
 // Captures `acli … --help` for every command a JiraAdapter method could use.
 // Help only: no command here ever touches Jira. Output: workspace/discovery/help/*.txt
 import { mkdir, writeFile } from 'node:fs/promises';
-import { workspaceDir } from '../env.js';
+import { workspacePath } from '../env.js';
 import { acli } from './acli.js';
 
 const COMMANDS: string[][] = [
@@ -28,7 +28,7 @@ const COMMANDS: string[][] = [
   ['jira', 'workitem', 'comment', 'list'],
 ];
 
-const outDir = `${workspaceDir}/discovery/help`;
+const outDir = `${workspacePath()}/discovery/help`;
 await mkdir(outDir, { recursive: true });
 
 for (const cmd of COMMANDS) {

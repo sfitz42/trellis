@@ -99,10 +99,10 @@ export function change(op: ChangeOp): string {
   switch (op.kind) {
     case 'epic.create': return `create epic "${op.after.summary}"${op.after.dueDate ? ` due ${op.after.dueDate}` : ''}`;
     case 'ticket.create': return `create ${op.after.issueType} under ${op.after.epicId ?? 'no epic'}: "${op.after.summary}"`;
-    case 'ticket.move': return `epic ${v(op.before)} → ${v(op.after)}`;
+    case 'ticket.move': return `epic ${v(op.before)} → ${v(op.after)} (comment in Jira)`;
     case 'field.update': return `${op.field} ${v(op.before)} → ${v(op.after)}`;
     case 'transition': return `status ${v(op.before)} → ${op.after}`;
-    case 'epic.dueDate': return `due ${v(op.before)} → ${v(op.after)}`;
+    case 'epic.dates': return `dates ${v(op.before.startDate)}..${v(op.before.dueDate)} → ${v(op.after.startDate)}..${v(op.after.dueDate)} (comment in Jira)`;
     case 'link.add': return `+ ${op.linkType.toLowerCase()} ${op.to}`;
     case 'link.remove': return `− ${op.linkType.toLowerCase()} ${op.to}`;
   }

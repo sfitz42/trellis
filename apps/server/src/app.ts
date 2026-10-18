@@ -38,7 +38,7 @@ export async function buildApp(opts: AppOptions): Promise<App> {
     });
   }
 
-  const stopWatching = watchWorkspace(opts.workspaceDir, [FILES.snapshot, FILES.applyLog], (name) => {
+  const stopWatching = watchWorkspace(opts.workspaceDir, [FILES.snapshot, FILES.applyLog, FILES.applyPlan], (name) => {
     session.onFileChanged(name).catch((err: unknown) => { app.log.error(err); });
   }, { poll: opts.watchPoll ?? false });
   const sweep = setInterval(() => { session.expireClaims(); }, opts.claimSweepMs ?? 1000);

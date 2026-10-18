@@ -4,7 +4,7 @@
 import { execFile } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { loadJiraEnv, workspaceDir } from '../env.js';
+import { loadJiraEnv, workspacePath } from '../env.js';
 import { acli } from './acli.js';
 
 const run = promisify(execFile);
@@ -24,7 +24,7 @@ if (!/:\s*0\s*$/.test(countOut.trim())) {
   process.exit(1);
 }
 
-const seedDir = `${workspaceDir}/discovery/seed`;
+const seedDir = `${workspacePath()}/discovery/seed`;
 await mkdir(seedDir, { recursive: true });
 const log: { step: string; args: string[]; ok: boolean; out: string }[] = [];
 

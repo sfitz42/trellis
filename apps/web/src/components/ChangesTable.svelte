@@ -5,11 +5,11 @@
 
   const LABEL: Record<ChangeOp['kind'], string> = {
     'epic.create': 'Create', 'ticket.create': 'Create', 'ticket.move': 'Move', 'field.update': 'Update',
-    transition: 'Transition', 'epic.dueDate': 'Dates', 'link.add': 'Link', 'link.remove': 'Unlink',
+    transition: 'Transition', 'epic.dates': 'Dates', 'link.add': 'Link', 'link.remove': 'Unlink',
   };
   const TONE: Record<ChangeOp['kind'], string> = {
     'epic.create': 'people', 'ticket.create': 'people', 'ticket.move': 'olive', 'field.update': 'warn',
-    transition: 'changed', 'epic.dueDate': 'changed', 'link.add': 'people', 'link.remove': 'error',
+    transition: 'changed', 'epic.dates': 'changed', 'link.add': 'people', 'link.remove': 'error',
   };
 
   function change(op: ChangeOp): string {
@@ -22,10 +22,10 @@
     switch (op.kind) {
       case 'epic.create': return `Epic · ${op.after.summary}${op.after.dueDate ? ` · due ${op.after.dueDate}` : ''}`;
       case 'ticket.create': return `${op.after.issueType} under ${op.after.epicId ?? 'no epic'} · ${op.after.summary}`;
-      case 'ticket.move': return `Parent ${v(op.before)} → ${v(op.after)}`;
+      case 'ticket.move': return `Parent ${v(op.before)} → ${v(op.after)} · as a Jira comment`;
       case 'field.update': return `${op.field} ${v(op.before)} → ${v(op.after)}`;
       case 'transition': return `${v(op.before)} → ${op.after}`;
-      case 'epic.dueDate': return `Due ${v(op.before)} → ${v(op.after)}`;
+      case 'epic.dates': return `${v(op.after.startDate)} → ${v(op.after.dueDate)} (was ${v(op.before.startDate)} → ${v(op.before.dueDate)}) · as a Jira comment`;
       case 'link.add': return `${op.linkType.toLowerCase()} ${op.to}`;
       case 'link.remove': return `no longer ${op.linkType.toLowerCase()} ${op.to}`;
     }

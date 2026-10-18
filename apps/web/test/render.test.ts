@@ -200,10 +200,17 @@ describe('screen 4 · freeze and apply', () => {
     expect(html).toContain('Watching apply-log.json');
     expect(html).toContain('Unfreeze without applying');
 
-    live.applyLog = [{ target: 'NEW-1', kind: 'ticket.create', status: 'done', createdKey: 'PROJ-400' }, { target: 'PROJ-126', status: 'drift', message: 'assignee changed in Jira' }];
+    live.applyLog = [{ target: 'NEW-1', kind: 'ticket.create', status: 'done', createdKey: 'PROJ-400' }];
+    live.applyPlan = {
+      changesetId: live.changeset?.id,
+      steps: [{ id: '4', kind: 'field.update', target: 'PROJ-126', summary: 'assignee', run: false, drift: { field: 'assignee', snapshot: 'acc-1', jira: 'acc-2', trellis: 'acc-3' } }],
+    };
+    live.driftDecisions = { changesetId: live.changeset?.id ?? null, decisions: { '4': 'overwrite' } };
     const after = text(render(FreezeScreen, { props: { live } }));
     expect(after).toContain('NEW-1 → PROJ-400');
     expect(after).toContain('1 drift conflict');
+    expect(after).toContain('assignee: Jira now');
+    expect(after).toMatch(/aria-pressed="true"[^>]*>Overwrite with roadmap/);
     expect(after).toContain('4 · Re-pull snapshot');
   });
 

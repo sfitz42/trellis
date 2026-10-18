@@ -1,7 +1,7 @@
 // Read-only exploration of JIRA_PROJECT_KEY. Raw output goes to workspace/discovery/ (gitignored);
 // only counts, ids and type/status names are printed.
 import { mkdir, writeFile } from 'node:fs/promises';
-import { loadJiraEnv, workspaceDir } from '../env.js';
+import { loadJiraEnv, workspacePath } from '../env.js';
 import { acli, acliJson } from './acli.js';
 
 interface RawIssue {
@@ -11,7 +11,7 @@ interface RawIssue {
 
 const env = loadJiraEnv();
 const key = env.JIRA_PROJECT_KEY;
-const rawDir = `${workspaceDir}/discovery/raw`;
+const rawDir = `${workspacePath()}/discovery/raw`;
 await mkdir(rawDir, { recursive: true });
 
 async function save(name: string, data: unknown): Promise<void> {

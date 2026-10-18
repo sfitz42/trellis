@@ -17,7 +17,9 @@
     "jira:discover": "pnpm --filter @trellis/jira exec tsx src/discovery/explore.ts",
     "jira:help-audit": "pnpm --filter @trellis/jira exec tsx src/discovery/help-audit.ts",
     "jira:fixture": "pnpm --filter @trellis/jira exec tsx src/discovery/make-fixture.ts",
-    "trellis": "pnpm --silent --filter @trellis/cli trellis"
+    "trellis": "pnpm --silent --filter @trellis/cli trellis",
+    "jira:pull": "pnpm --silent --filter @trellis/jira exec tsx --conditions=development src/pull.ts",
+    "jira:apply": "pnpm --silent --filter @trellis/jira exec tsx --conditions=development src/apply.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

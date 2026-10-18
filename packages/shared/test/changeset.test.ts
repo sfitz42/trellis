@@ -17,7 +17,7 @@ describe('computeChangeset', () => {
     expect(computeChangeset(loadSnapshot(), s).ops).toEqual([]);
   });
 
-  it('ignores Trellis-owned fields', () => {
+  it('ignores story points, colour, ordering and timeline; date changes become one comment op', () => {
     const { state } = apply(freshState(), [
       { type: 'epic.setDates', id: 'PROJ-41', startDate: '2026-11-01', dueDate: '2027-02-28' }, // due unchanged
       { type: 'ticket.update', id: 'PROJ-121', fields: { storyPoints: 8 } },
@@ -26,7 +26,20 @@ describe('computeChangeset', () => {
       { type: 'ticket.move', id: 'PROJ-128', epicId: 'PROJ-41', index: 0 },
       { type: 'timeline.set', timeline: { scale: 'weeks', start: '2026-10-01', end: '2026-12-31' } },
     ]);
-    expect(kinds(state)).toEqual([]);
+    expect(kinds(state)).toEqual(['epic.dates']);
+  });
+
+  it('dates: compared with what Jira was told, and silent once acknowledged', () => {
+    const moved = apply(freshState(), [{ type: 'epic.setDates', id: 'PROJ-43', startDate: null, dueDate: '2027-06-30' }]).state;
+    expect(computeChangeset(loadSnapshot(), moved).ops.map((o) => o.kind)).toEqual(['epic.dates']);
+    const told = { ...moved, acknowledged: { ...moved.acknowledged, 'PROJ-43.dates': { startDate: null, dueDate: '2027-06-30' } } };
+    expect(kinds(told)).toEqual([]);
+  });
+
+  it('epic moves of existing tickets are silent once acknowledged', () => {
+    const moved = apply(freshState(), [{ type: 'ticket.move', id: 'PROJ-126', epicId: 'PROJ-44' }]).state;
+    expect(kinds(moved)).toEqual(['ticket.move']);
+    expect(kinds({ ...moved, acknowledged: { ...moved.acknowledged, 'PROJ-126.epicId': 'PROJ-44' } })).toEqual([]);
   });
 
   it('cancels out edits that return to the Jira value', () => {
@@ -48,7 +61,7 @@ describe('computeChangeset', () => {
     ], { atomic: false });
     // The ticket.create above ran before its epic existed and was rejected; create it again.
     const s2 = apply(state, [{ type: 'ticket.create', epicId: 'NEW-1', fields: { summary: 'Child of new epic' } }]).state;
-    expect(kinds(s2)).toEqual(['epic.create', 'ticket.create', 'ticket.move', 'field.update', 'transition', 'epic.dueDate', 'link.add', 'link.remove']);
+    expect(kinds(s2)).toEqual(['epic.create', 'ticket.create', 'ticket.move', 'field.update', 'transition', 'epic.dates', 'link.add', 'link.remove']);
     const cs = computeChangeset(loadSnapshot(), s2);
     expect(cs.ops.map((o) => o.index)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(cs.ops.find((o) => o.kind === 'ticket.create')).toMatchObject({ target: 'NEW-2', after: { epicId: 'NEW-1', issueType: 'Task' } });
@@ -62,7 +75,7 @@ describe('computeChangeset', () => {
     ]);
     const ops = computeChangeset(loadSnapshot(), state).ops;
     expect(ops.find((o) => o.kind === 'ticket.move')).toMatchObject({ before: 'PROJ-41', after: 'PROJ-44' });
-    expect(ops.find((o) => o.kind === 'epic.dueDate')).toMatchObject({ before: '2027-02-28', after: '2027-03-31' });
+    expect(ops.find((o) => o.kind === 'epic.dates')).toMatchObject({ before: { startDate: null, dueDate: '2027-02-28' }, after: { startDate: null, dueDate: '2027-03-31' } });
     expect(ops.find((o) => o.kind === 'link.remove')).toMatchObject({ target: 'PROJ-121', to: 'PROJ-122', linkType: 'Blocks', jiraLinkId: expect.any(String) });
   });
 

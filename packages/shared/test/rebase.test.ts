@@ -100,6 +100,31 @@ describe('rebaseOnSnapshot', () => {
     expect(state.tickets['PROJ-124']!.links.some((l) => l.type === 'Relates')).toBe(true);
   });
 
+  it('due dates: Jira wins only if Trellis has not changed them since Jira was told', () => {
+    const next = jiraChanged((s) => {
+      s.epics['PROJ-41']!.dueDate = '2027-01-31'; // changed in Jira, untouched in Trellis
+      s.epics['PROJ-42']!.dueDate = '2027-03-31'; // changed in Jira, but Trellis moved it too
+    });
+    const edited = apply(freshState(), [{ type: 'epic.setDates', id: 'PROJ-42', startDate: null, dueDate: '2027-06-30' }]).state;
+    const { state, keptEdits } = rebaseOnSnapshot(edited, loadSnapshot(), next);
+    expect(state.epics['PROJ-41']!.dueDate).toBe('2027-01-31');
+    expect(state.acknowledged['PROJ-41.dates']).toEqual({ startDate: null, dueDate: '2027-01-31' });
+    expect(state.epics['PROJ-42']!.dueDate).toBe('2027-06-30');
+    expect(keptEdits).toContain('PROJ-42.dueDate');
+  });
+
+  it('marks comment-only changes as told after apply, so the changeset empties', () => {
+    const edited = apply(freshState(), [
+      { type: 'epic.setDates', id: 'PROJ-43', startDate: '2027-03-01', dueDate: '2027-06-30' },
+      { type: 'ticket.move', id: 'PROJ-126', epicId: 'PROJ-44' },
+    ]).state;
+    const next = jiraChanged(() => undefined);
+    const { state } = rebaseOnSnapshot(edited, loadSnapshot(), next, {}, ['PROJ-43.dates', 'PROJ-126.epicId']);
+    expect(state.epics['PROJ-43']).toMatchObject({ startDate: '2027-03-01', dueDate: '2027-06-30' });
+    expect(state.tickets['PROJ-126']!.epicId).toBe('PROJ-44');
+    expect(computeChangeset(next, state).ops).toEqual([]);
+  });
+
   it('bumps the version and keeps meta for surviving items', () => {
     const edited = apply(freshState(), [{ type: 'ticket.update', id: 'PROJ-46', fields: { summary: 'x' } }, { type: 'ticket.update', id: 'PROJ-45', fields: { summary: 'y' } }]).state;
     const { state } = rebaseOnSnapshot(edited, loadSnapshot(), jiraChanged((s) => { delete s.tickets['PROJ-46']; }));

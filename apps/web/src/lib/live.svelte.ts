@@ -1,7 +1,7 @@
 // The live session as seen by this browser: websocket, optimistic edits, presence, claims,
 // activity and agent batches. Components read its $state fields and call its methods.
 import type {
-  Batch, BatchResult, Changeset, Claim, IssueId, Op, OplogEntry, PresenceClient, RoadmapState, ServerMessage,
+  Batch, BatchResult, Changeset, Claim, DriftDecisions, IssueId, Op, OplogEntry, PresenceClient, RoadmapState, ServerMessage,
   Snapshot, SnapshotSummary,
 } from '@trellis/shared';
 import { changesetFor, idsOfOp } from './items.js';
@@ -41,6 +41,9 @@ export class Live {
   notices = $state<Notice[]>([]);
   snapshotAvailable = $state.raw<SnapshotSummary | null>(null);
   applyLog = $state.raw<unknown>(null);
+  /** workspace/apply-plan.json from the latest dry run (drift lives here). */
+  applyPlan = $state.raw<unknown>(null);
+  driftDecisions = $state.raw<DriftDecisions>({ changesetId: null, decisions: {} });
   /** Changeset written at freeze time (server's copy). */
   frozenChangeset = $state.raw<Changeset | null>(null);
   /** Set when a re-pull arrived while frozen (step 4 of the freeze screen). */
@@ -134,6 +137,9 @@ export class Live {
         this.presence = msg.presence;
         this.claims = msg.claims;
         this.snapshotAvailable = msg.snapshotSummary.newerAvailable ? msg.snapshotSummary : null;
+        this.applyPlan = msg.apply?.plan ?? null;
+        this.applyLog = msg.apply?.log ?? null;
+        this.driftDecisions = msg.apply?.decisions ?? { changesetId: null, decisions: {} };
         this.connection = 'open';
         this.refresh();
         break;
@@ -182,6 +188,12 @@ export class Live {
         break;
       case 'apply.progress':
         this.applyLog = msg.log;
+        break;
+      case 'apply.plan':
+        this.applyPlan = msg.plan;
+        break;
+      case 'drift.decisions':
+        this.driftDecisions = msg.decisions;
         break;
       case 'error':
         this.notify('error', `${msg.code}: ${msg.message}`);
@@ -282,6 +294,10 @@ export class Live {
 
   unfreeze(): Promise<unknown> {
     return this.post('/api/unfreeze');
+  }
+
+  decideDrift(stepId: string, decision: 'keep' | 'overwrite'): Promise<unknown> {
+    return this.post('/api/drift', { stepId, decision });
   }
 
   reloadSnapshot(): Promise<unknown> {

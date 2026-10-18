@@ -29,5 +29,8 @@ export function loadJiraEnv(): JiraEnv {
   return parsed.data;
 }
 
-export const workspaceDir = process.env['WORKSPACE_DIR'] ?? `${repoRoot}workspace`;
+/** The workspace folder; read after loadJiraEnv() so WORKSPACE_DIR may come from .env. */
+export function workspacePath(): string {
+  return process.env['WORKSPACE_DIR'] ?? `${repoRoot}workspace`;
+}
 export { repoRoot };

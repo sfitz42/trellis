@@ -35,14 +35,14 @@ describe('differs from Jira', () => {
     expect(reverted.tickets['PROJ-121']?.storyPoints).toBe(8);
   });
 
-  it('reverts epics, keeping their Trellis-owned start date', () => {
+  it('reverts epics to the dates Jira was last told', () => {
     const edited = apply(fresh(), [
       { type: 'epic.setDates', id: 'PROJ-41', startDate: '2026-11-01', dueDate: '2027-03-31' },
       { type: 'epic.update', id: 'PROJ-41', fields: { summary: 'Y' } },
     ]);
     const reverted = apply(edited, revertOps('PROJ-41', snapshot, edited));
     expect(computeChangeset(snapshot, reverted).ops).toEqual([]);
-    expect(reverted.epics['PROJ-41']?.startDate).toBe('2026-11-01');
+    expect(reverted.epics['PROJ-41']).toMatchObject({ startDate: null, dueDate: '2027-02-28' });
   });
 });
 

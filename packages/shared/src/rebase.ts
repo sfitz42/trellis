@@ -5,7 +5,7 @@
 // renamed to their real keys.
 import type { Epic, IssueId, Link, RoadmapState, Snapshot, Ticket } from './schemas.js';
 import { isTempId } from './schemas.js';
-import { compareIds } from './state.js';
+import { acknowledgedDates, compareIds, datesKey } from './state.js';
 
 export interface RebaseResult {
   state: RoadmapState;
@@ -19,7 +19,8 @@ export interface RebaseResult {
   keptEdits: string[];
 }
 
-const EPIC_CORE = ['summary', 'description', 'status', 'dueDate'] as const;
+// Epic dates are Trellis-owned: merged against `acknowledged` (what Jira was told), not the snapshot.
+const EPIC_CORE = ['summary', 'description', 'status'] as const;
 const TICKET_CORE = ['epicId', 'issueType', 'summary', 'description', 'status', 'assignee', 'labels'] as const;
 
 function norm(field: string, v: unknown): string {
@@ -55,6 +56,8 @@ export function rebaseOnSnapshot(
   oldSnapshot: Snapshot | null,
   newSnapshot: Snapshot,
   tempIdMap: Record<IssueId, IssueId> = {},
+  /** `acknowledged` keys (e.g. `PROJ-43.dates`, `PROJ-126.epicId`) that apply told Jira about. */
+  told: readonly string[] = [],
 ): RebaseResult {
   // 1. Rename NEW-* items that now exist in Jira.
   const renamed: Record<IssueId, IssueId> = {};
@@ -63,6 +66,14 @@ export function rebaseOnSnapshot(
   }
   const s = renameAll(structuredClone(current), renamed);
   const renamedKeys = new Set(Object.values(renamed));
+  const acknowledged: Record<string, unknown> = { ...s.acknowledged };
+  // Apply posted these: from now on Jira "knows" the current Trellis value.
+  for (const key of told) {
+    const k = key.replace(/^([^.]+)/, (id) => renamed[id] ?? id);
+    const [id = '', field] = k.split('.');
+    if (field === 'dates' && s.epics[id]) acknowledged[k] = { startDate: s.epics[id].startDate, dueDate: s.epics[id].dueDate };
+    if (field === 'epicId' && s.tickets[id]) acknowledged[k] = s.tickets[id].epicId;
+  }
 
   // The base for the merge: the old snapshot, plus renamed items as we have them (so Jira's
   // values win for those: apply wrote our values, Jira's are what actually landed).
@@ -84,6 +95,7 @@ export function rebaseOnSnapshot(
     const ours = s.epics[theirs.id];
     if (!ours) {
       epics[theirs.id] = structuredClone(theirs);
+      acknowledged[datesKey(theirs.id)] = { startDate: theirs.startDate, dueDate: theirs.dueDate };
       added.push(theirs.id);
       continue;
     }
@@ -92,6 +104,20 @@ export function rebaseOnSnapshot(
     for (const f of EPIC_CORE) {
       if (norm(f, ours[f]) === norm(f, base[f])) assign(merged, f, theirs[f]);
       else if (norm(f, ours[f]) !== norm(f, theirs[f])) keptEdits.push(`${ours.id}.${f}`);
+    }
+    // Due date (Trellis-owned): take Jira's value only when Jira itself changed it since the last
+    // snapshot AND Trellis hasn't changed it since Jira was last told. Otherwise keep ours.
+    const toldDates = acknowledgedDates({ ...s, acknowledged }, theirs.id) ?? { startDate: ours.startDate, dueDate: base.dueDate };
+    if (renamedKeys.has(theirs.id)) {
+      acknowledged[datesKey(theirs.id)] = { startDate: ours.startDate, dueDate: theirs.dueDate };
+      merged.dueDate = theirs.dueDate;
+    } else if (theirs.dueDate !== base.dueDate) {
+      if (ours.dueDate === toldDates.dueDate) {
+        merged.dueDate = theirs.dueDate;
+        acknowledged[datesKey(theirs.id)] = { startDate: toldDates.startDate, dueDate: theirs.dueDate };
+      } else if (ours.dueDate !== theirs.dueDate) {
+        keptEdits.push(`${ours.id}.dueDate`);
+      }
     }
     epics[theirs.id] = merged;
   }
@@ -152,7 +178,8 @@ export function rebaseOnSnapshot(
   }
 
   const gone = new Set(dropped);
-  const meta = Object.fromEntries(Object.entries(s.meta).filter(([k]) => !gone.has(k.slice(0, k.indexOf('.')))));
+  const alive = ([k]: [string, unknown]): boolean => !gone.has(k.slice(0, k.indexOf('.')));
+  const meta = Object.fromEntries(Object.entries(s.meta).filter(alive));
 
   return {
     state: {
@@ -162,6 +189,7 @@ export function rebaseOnSnapshot(
       tickets,
       epicOrder,
       meta,
+      acknowledged: Object.fromEntries(Object.entries(acknowledged).filter(alive)),
       version: current.version + 1,
     },
     renamed,
@@ -185,9 +213,11 @@ function renameAll(s: RoadmapState, map: Record<IssueId, IssueId>): RoadmapState
   for (const t of Object.values(s.tickets)) {
     tickets[r(t.id)] = { ...t, id: r(t.id), epicId: t.epicId === null ? null : r(t.epicId), links: t.links.map((l) => ({ ...l, target: r(l.target) })) };
   }
-  const meta = Object.fromEntries(Object.entries(s.meta).map(([k, v]) => {
+  const renameKey = <V,>([k, v]: [string, V]): [string, V] => {
     const dot = k.indexOf('.');
     return dot > 0 ? [`${r(k.slice(0, dot))}${k.slice(dot)}`, v] : [k, v];
-  }));
-  return { ...s, epics, tickets, epicOrder: s.epicOrder.map(r), meta };
+  };
+  const meta = Object.fromEntries(Object.entries(s.meta).map(renameKey));
+  const acknowledged = Object.fromEntries(Object.entries(s.acknowledged).map(renameKey));
+  return { ...s, epics, tickets, epicOrder: s.epicOrder.map(r), meta, acknowledged };
 }

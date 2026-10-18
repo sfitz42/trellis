@@ -2,7 +2,7 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { BatchResult, Changeset, OplogEntry, RoadmapState, Snapshot, Status } from '@trellis/shared';
-import { tempIdsFromApplyLog } from '../src/session.js';
+import { tempIdsFromApplyLog, toldFromApplyLog } from '../src/session.js';
 import { agent, cleanup, Client, readFixture, sleep, start } from './helpers.js';
 import type { Running } from './helpers.js';
 
@@ -314,7 +314,58 @@ describe('snapshot reload and file watching', () => {
   });
 });
 
-describe('tempIdsFromApplyLog', () => {
+describe('apply hand-off', () => {
+  it('streams the dry-run plan, records drift decisions, and includes both in welcome', async () => {
+    const r = await server();
+    const shaun = await client(r, 'Shaun');
+    await r.http('POST', '/api/batch', { author: agent, ops: [{ type: 'ticket.update', id: 'PROJ-121', fields: { summary: 'x' } }] });
+    expect((await r.http('POST', '/api/drift', { stepId: '0', decision: 'keep' })).status).toBe(409); // not frozen
+    const { body: frozen } = await r.http<{ changeset: Changeset }>('POST', '/api/freeze', { by: 'Shaun' });
+    const plan = { changesetId: frozen.changeset.id, steps: [{ id: '0', drift: { field: 'summary' } }] };
+    await writeFile(join(r.dir, 'apply-plan.json'), JSON.stringify(plan));
+    expect((await shaun.next('apply.plan')).plan).toEqual(plan);
+
+    const d = await r.http<{ decisions: Record<string, string> }>('POST', '/api/drift', { stepId: '0', decision: 'overwrite' });
+    expect(d.body.decisions).toEqual({ '0': 'overwrite' });
+    expect((await shaun.next('drift.decisions')).decisions).toEqual({ changesetId: frozen.changeset.id, decisions: { '0': 'overwrite' } });
+    expect(JSON.parse(await readFile(join(r.dir, 'drift-decisions.json'), 'utf8'))).toMatchObject({ changesetId: frozen.changeset.id });
+
+    const late = await client(r, 'Priya');
+    const welcome = late.messages[0];
+    expect(welcome?.type === 'welcome' && welcome.apply).toMatchObject({ plan, decisions: { decisions: { '0': 'overwrite' } } });
+    expect((await r.http('POST', '/api/drift', { stepId: '0', decision: 'maybe' })).status).toBe(400);
+  });
+
+  it('marks commented changes as told on the post-apply re-pull, so the changeset empties', async () => {
+    const r = await server();
+    const shaun = await client(r, 'Shaun');
+    await r.http('POST', '/api/batch', { author: agent, ops: [
+      { type: 'epic.setDates', id: 'PROJ-43', startDate: null, dueDate: '2027-06-30' },
+      { type: 'ticket.move', id: 'PROJ-126', epicId: 'PROJ-44' },
+    ] });
+    await r.http('POST', '/api/freeze', { by: 'Shaun' });
+    const cs = (await r.http<Changeset>('GET', '/api/changeset')).body;
+    expect(cs.ops.map((o) => o.kind).sort()).toEqual(['epic.dates', 'ticket.move']);
+    await writeFile(join(r.dir, 'apply-log.json'), JSON.stringify([
+      { changesetId: cs.id, step: '0', status: 'commented', target: 'PROJ-126', acknowledge: 'PROJ-126.epicId' },
+      { changesetId: cs.id, step: '1', status: 'commented', target: 'PROJ-43', acknowledge: 'PROJ-43.dates' },
+    ]));
+    // Jira unchanged (comments only): re-pull the same issues.
+    const s = await readFixture();
+    s['pulledAt'] = new Date().toISOString();
+    await writeFile(join(r.dir, 'snapshot.json'), JSON.stringify(s));
+    const reloaded = await shaun.next('snapshot.reloaded');
+    expect(reloaded.state.epics['PROJ-43']?.dueDate).toBe('2027-06-30');
+    expect(reloaded.state.tickets['PROJ-126']?.epicId).toBe('PROJ-44');
+    expect((await r.http<Status>('GET', '/api/status')).body.pendingChanges).toBe(0);
+  });
+});
+
+describe('tempIdsFromApplyLog / toldFromApplyLog', () => {
+  it('reads acknowledged keys from commented entries', () => {
+    expect(toldFromApplyLog([{ status: 'commented', acknowledge: 'PROJ-1.dates' }, { status: 'done', acknowledge: 'x' }])).toEqual(['PROJ-1.dates']);
+  });
+
   it('reads NEW-* → key pairs from loosely shaped logs', () => {
     expect(tempIdsFromApplyLog([{ target: 'NEW-1', createdKey: 'PROJ-9' }, { target: 'PROJ-1', status: 'done' }])).toEqual({ 'NEW-1': 'PROJ-9' });
     expect(tempIdsFromApplyLog({ entries: [{ tempId: 'NEW-2', key: 'PROJ-10' }] })).toEqual({ 'NEW-2': 'PROJ-10' });

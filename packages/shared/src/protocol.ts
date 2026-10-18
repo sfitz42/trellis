@@ -74,6 +74,8 @@ export type ServerMessage =
       presence: PresenceClient[];
       claims: Claim[];
       version: number;
+      /** While frozen: the dry-run plan, apply log and drift decisions so far. */
+      apply: ApplyStatus | null;
     }
   | { type: 'batch.applied'; batch: Batch & { id: string }; results: BatchResult; version: number }
   | { type: 'batch.result'; requestId: string; results: BatchResult }
@@ -83,7 +85,22 @@ export type ServerMessage =
   | { type: 'snapshot.available'; summary: SnapshotSummary }
   | { type: 'snapshot.reloaded'; summary: SnapshotSummary; state: RoadmapState; snapshot: Snapshot }
   | { type: 'apply.progress'; log: unknown }
+  | { type: 'apply.plan'; plan: unknown }
+  | { type: 'drift.decisions'; decisions: DriftDecisions }
   | { type: 'error'; code: string; message: string };
+
+/** Keep Jira's value or overwrite it with the roadmap's, per apply-plan step id. */
+export interface DriftDecisions {
+  changesetId: string | null;
+  decisions: Record<string, 'keep' | 'overwrite'>;
+}
+
+export interface ApplyStatus {
+  /** workspace/apply-plan.json, written by `pnpm jira:apply` (shape owned by @trellis/jira). */
+  plan: unknown;
+  log: unknown;
+  decisions: DriftDecisions;
+}
 
 /** HTTP error body. */
 export interface ApiError {

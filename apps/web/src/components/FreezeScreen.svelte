@@ -10,7 +10,13 @@
   const frozen = $derived(live.roadmap.frozen ?? { by: '?', at: new Date(0).toISOString() });
   const cs = $derived(live.frozenChangeset ?? live.changeset);
   const log = $derived(Array.isArray(live.applyLog) ? (live.applyLog as Record<string, unknown>[]) : []);
-  const drift = $derived(log.filter((e) => e['status'] === 'drift' || e['drift'] !== undefined));
+  interface PlanStepView { id: string; kind: string; target: string; summary: string; run: boolean; drift?: { field: string; snapshot: unknown; jira: unknown; trellis: unknown } }
+  const planSteps = $derived.by((): PlanStepView[] => {
+    const p = live.applyPlan as { changesetId?: unknown; steps?: unknown } | null;
+    return p && p.changesetId === cs?.id && Array.isArray(p.steps) ? (p.steps as PlanStepView[]) : [];
+  });
+  const drift = $derived(planSteps.filter((s) => s.drift));
+  const val = (v: unknown): string => (v === null || v === undefined || v === '' ? '—' : typeof v === 'string' ? v : Array.isArray(v) ? v.join(', ') : JSON.stringify(v));
   const pulledAt = $derived(live.summary?.pulledAt ? new Date(live.summary.pulledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—');
   const step = $derived(live.repulledAt ? 5 : log.length > 0 ? 4 : 3);
   const steps = ['Frozen', 'Changeset written', 'Waiting for agent to apply', 'Re-pull snapshot', 'Unfrozen'];
@@ -57,9 +63,17 @@ Never run --yes before I have confirmed the dry run.`);
     <h1>Changeset · {cs?.ops.length ?? 0} operations <span>roadmap v{live.state?.version} vs Jira snapshot {pulledAt}</span></h1>
     {#if drift.length}
       <div class="drift" role="alert">
-        <strong>{drift.length} drift conflict{drift.length === 1 ? '' : 's'}.</strong>
-        Jira changed after the snapshot. Decide in the dry run with <code>--on-drift skip|overwrite</code>.
-        <ul>{#each drift as d, i (i)}<li><code>{str(d['target'])}</code> {str(d['message'])}</li>{/each}</ul>
+        <p><strong>{drift.length} drift conflict{drift.length === 1 ? '' : 's'}.</strong> Jira changed after the snapshot; the changeset would overwrite it. Your choice is used when the agent runs <code>jira:apply --yes</code> (undecided: keep Jira's value).</p>
+        {#each drift as d (d.id)}
+          {@const choice = live.driftDecisions.decisions[d.id]}
+          <div class="conflict">
+            <p><code>{d.target}</code> {d.drift?.field}: Jira now <strong>{val(d.drift?.jira)}</strong> (was {val(d.drift?.snapshot)}); roadmap wants <strong>{val(d.drift?.trellis)}</strong>.</p>
+            <div class="choices" role="group" aria-label="Resolve drift on {d.target}">
+              <button class="btn small" aria-pressed={choice !== 'overwrite'} class:on={choice !== 'overwrite'} onclick={() => { void live.decideDrift(d.id, 'keep'); }}>Keep Jira value</button>
+              <button class="btn small" aria-pressed={choice === 'overwrite'} class:on={choice === 'overwrite'} onclick={() => { void live.decideDrift(d.id, 'overwrite'); }}>Overwrite with roadmap</button>
+            </div>
+          </div>
+        {/each}
       </div>
     {/if}
     <div class="panel"><ChangesTable ops={cs?.ops ?? []} /></div>
@@ -107,7 +121,11 @@ pnpm jira:pull</code></pre>
   h1 { font-size: 20px; margin: 0 0 14px; }
   h1 span { font-size: 13px; font-weight: 400; color: var(--ink-muted); }
   .drift { padding: 12px 16px; background: var(--warn-tint); border: 1px solid var(--warn); border-radius: 8px; color: var(--warn-text); margin-bottom: 14px; }
-  .drift ul { margin: 6px 0 0; padding-left: 18px; }
+  .drift p { margin: 0 0 8px; }
+  .conflict { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); flex-wrap: wrap; }
+  .conflict p { margin: 0; flex: 1; }
+  .choices { display: flex; gap: 6px; }
+  .choices .on { background: var(--surface); border-color: var(--warn-text); font-weight: 600; }
   .hand { padding: 18px; display: grid; gap: 10px; }
   h2 { margin: 0; font-size: 16px; }
   .hand p { margin: 0; font-size: 13.5px; color: var(--ink-muted); }

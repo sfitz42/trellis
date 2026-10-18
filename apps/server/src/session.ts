@@ -7,7 +7,7 @@ import {
 } from '@trellis/shared';
 import type {
   Author, Batch, BatchResult, Changeset, Claim, ClientKind, IssueId, OplogEntry, PresenceClient,
-  RebaseResult, ServerMessage, SnapshotSummary, Status, UndoPlan,
+  ApplyStatus, DriftDecisions, RebaseResult, ServerMessage, SnapshotSummary, Status, UndoPlan,
 } from '@trellis/shared';
 import { FILES, roadmapMirror, Workspace } from './workspace.js';
 
@@ -144,11 +144,35 @@ export class Session {
     return status;
   }
 
-  welcome(): Extract<ServerMessage, { type: 'welcome' }> {
+  async applyStatus(): Promise<ApplyStatus | null> {
+    if (!this.state.frozen) return null;
+    const read = (n: string): Promise<unknown> => this.ws.readJson(n).catch(() => null);
+    return { plan: await read(FILES.applyPlan), log: await read(FILES.applyLog), decisions: await this.driftDecisions() };
+  }
+
+  async driftDecisions(): Promise<DriftDecisions> {
+    const raw = (await this.ws.readJson(FILES.driftDecisions).catch(() => null)) as Partial<DriftDecisions> | null;
+    const id = this.state.frozen ? this.changeset().id : null;
+    // Decisions belong to one changeset; ignore stale ones.
+    return raw?.changesetId === id && raw.decisions ? { changesetId: id, decisions: raw.decisions } : { changesetId: id, decisions: {} };
+  }
+
+  /** Freeze screen: keep Jira's value or overwrite it, for one drifted plan step. */
+  async decideDrift(stepId: string, decision: 'keep' | 'overwrite'): Promise<DriftDecisions> {
+    if (!this.state.frozen) throw new SessionError('NOT_FROZEN', 'drift decisions only apply while frozen');
+    const current = await this.driftDecisions();
+    const next: DriftDecisions = { changesetId: current.changesetId, decisions: { ...current.decisions, [stepId]: decision } };
+    await this.ws.writeJson(FILES.driftDecisions, next);
+    this.emit({ type: 'drift.decisions', decisions: next });
+    return next;
+  }
+
+  async welcome(): Promise<Extract<ServerMessage, { type: 'welcome' }>> {
     this.expireClaims();
     return {
       type: 'welcome', state: this.state, snapshot: this.baseSnapshot, snapshotSummary: this.snapshotSummary(),
       recent: this.oplog.slice(-RECENT_BATCHES), presence: this.presence(), claims: this.claimList(), version: this.state.version,
+      apply: await this.applyStatus(),
     };
   }
 
@@ -196,8 +220,11 @@ export class Session {
 
   hello(clientId: string, name: string, kind: ClientKind): void {
     this.clients.set(clientId, { clientId, name, kind, via: 'ws', selection: [], dragging: null });
-    // Deferred so the new client's `welcome` (sent right after hello) arrives before this.
-    queueMicrotask(() => { this.emitPresence(); });
+  }
+
+  /** Tell everyone who's here. Called after the new client's `welcome` has been sent. */
+  announce(): void {
+    this.emitPresence();
   }
 
   disconnect(clientId: string): void {
@@ -330,8 +357,8 @@ export class Session {
   async reloadSnapshot(): Promise<{ summary: SnapshotSummary } & Omit<RebaseResult, 'state'>> {
     const next = await readSnapshot(this.ws);
     if (!next) throw new SessionError('NO_SNAPSHOT', `${this.ws.path(FILES.snapshot)} not found`, 404);
-    const tempIds = tempIdsFromApplyLog(await this.ws.readJson(FILES.applyLog).catch(() => null));
-    const { state, ...info } = rebaseOnSnapshot(this.state, this.baseSnapshot, next, tempIds);
+    const applyLog = await this.ws.readJson(FILES.applyLog).catch(() => null);
+    const { state, ...info } = rebaseOnSnapshot(this.state, this.baseSnapshot, next, tempIdsFromApplyLog(applyLog), toldFromApplyLog(applyLog));
     this.state = state;
     this.baseSnapshot = next;
     this.diskSnapshot = next;
@@ -353,6 +380,9 @@ export class Session {
     } else if (name === FILES.applyLog) {
       const log = await this.ws.readJson(FILES.applyLog).catch(() => null);
       if (log !== null) this.emit({ type: 'apply.progress', log });
+    } else if (name === FILES.applyPlan) {
+      const plan = await this.ws.readJson(FILES.applyPlan).catch(() => null);
+      if (plan !== null) this.emit({ type: 'apply.plan', plan });
     }
   }
 
@@ -397,6 +427,13 @@ function emptySnapshot(projectKey: string): Snapshot {
     tickets: {},
     workflow: { epicIssueType: 'Epic', statuses: {}, transitions: null, assignableUsers: [] },
   };
+}
+
+/** `acknowledged` keys for comment-only changes apply posted (entries with status `commented`). */
+export function toldFromApplyLog(log: unknown): string[] {
+  const entries = Array.isArray(log) ? log : (log as { entries?: unknown } | null)?.entries;
+  if (!Array.isArray(entries)) return [];
+  return (entries as Record<string, unknown>[]).flatMap((e) => (e['status'] === 'commented' && typeof e['acknowledge'] === 'string' ? [e['acknowledge']] : []));
 }
 
 /**

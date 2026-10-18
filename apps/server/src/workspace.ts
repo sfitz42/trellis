@@ -13,6 +13,7 @@ export const FILES = {
   changeset: 'changeset.json',
   applyPlan: 'apply-plan.json',
   applyLog: 'apply-log.json',
+  driftDecisions: 'drift-decisions.json',
   lock: '.lock',
 } as const;
 

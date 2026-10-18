@@ -7,6 +7,7 @@ export default defineConfig({
       { test: { name: 'shared', include: ['packages/shared/test/**/*.test.ts'] } },
       { test: { name: 'server', include: ['apps/server/test/**/*.test.ts'] } },
       { test: { name: 'cli', include: ['packages/cli/test/**/*.test.ts'] } },
+      { test: { name: 'jira', include: ['packages/jira/test/**/*.test.ts'] } },
       './apps/web',
     ],
   },

@@ -1,6 +1,6 @@
 // Per-item views over the model: what differs from Jira, how to revert it, dependencies, and
 // plain-language descriptions of ops for the activity feed and agent panel.
-import { BLOCKS, computeChangeset, isTempId } from '@trellis/shared';
+import { acknowledgedDates, BLOCKS, computeChangeset, isTempId } from '@trellis/shared';
 import type { ChangeOp, Changeset, Epic, IssueId, Op, OplogEntry, RoadmapState, Snapshot, Ticket } from '@trellis/shared';
 import { fmtMonth } from './timeline.js';
 
@@ -40,7 +40,7 @@ export function describeChange(op: ChangeOp, forId?: IssueId): string {
     case 'ticket.move': return forId && forId !== op.target ? `${op.target} ${op.after === forId ? 'moved in' : 'moved out'}` : `epic: ${show(op.before)} → ${show(op.after)}`;
     case 'field.update': return `${op.field}: ${show(op.before)} → ${show(op.after)}`;
     case 'transition': return `status: ${show(op.before)} → ${op.after}`;
-    case 'epic.dueDate': return `due: ${show(op.before)} → ${show(op.after)}`;
+    case 'epic.dates': return `dates: ${show(op.before.startDate)} – ${show(op.before.dueDate)} → ${show(op.after.startDate)} – ${show(op.after.dueDate)} (comment in Jira)`;
     case 'link.add': return forId === op.to ? `links: + blocked by ${op.target}` : `links: + ${op.linkType.toLowerCase()} ${op.to}`;
     case 'link.remove': return forId === op.to ? `links: − blocked by ${op.target}` : `links: − ${op.linkType.toLowerCase()} ${op.to}`;
   }
@@ -57,7 +57,9 @@ export function revertOps(id: IssueId, snapshot: Snapshot, state: RoadmapState):
     if ((eNow.description ?? '') !== (eSnap.description ?? '')) fields.description = eSnap.description ?? '';
     if (Object.keys(fields).length) ops.push({ type: 'epic.update', id, fields });
     if (eNow.status !== eSnap.status) ops.push({ type: 'epic.transition', id, status: eSnap.status });
-    if (eNow.dueDate !== eSnap.dueDate) ops.push({ type: 'epic.setDates', id, startDate: eNow.startDate, dueDate: eSnap.dueDate });
+    // Dates are Trellis-owned: "Jira's values" are the dates Jira was last told.
+    const told = acknowledgedDates(state, id) ?? { startDate: eSnap.startDate, dueDate: eSnap.dueDate };
+    if (eNow.startDate !== told.startDate || eNow.dueDate !== told.dueDate) ops.push({ type: 'epic.setDates', id, startDate: told.startDate, dueDate: told.dueDate });
     return ops;
   }
   const tSnap = snapshot.tickets[id];

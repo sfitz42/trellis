@@ -10,6 +10,7 @@ const ClaimBody = z.strictObject({ ids: z.array(IssueId).min(1), holder: z.strin
 const ReleaseBody = z.strictObject({ ids: z.array(IssueId).min(1), holder: z.string().min(1) });
 const UndoBody = z.strictObject({ batchId: z.string().min(1), author: Author });
 const FreezeBody = z.strictObject({ by: z.string().min(1) });
+const DriftBody = z.strictObject({ stepId: z.string().min(1), decision: z.enum(['keep', 'overwrite']) });
 
 function bad(reply: FastifyReply, status: number, error: string, message: string, details?: unknown): FastifyReply {
   const body: ApiError = { error, message };
@@ -101,4 +102,12 @@ export function registerHttp(app: FastifyInstance, session: Session): void {
   });
 
   app.post('/api/snapshot/reload', () => session.reloadSnapshot());
+
+  app.get('/api/apply', () => session.applyStatus());
+
+  app.post('/api/drift', async (req, reply) => {
+    const body = parse(DriftBody, req.body, reply);
+    if (!body) return reply;
+    return session.decideDrift(body.stepId, body.decision);
+  });
 }

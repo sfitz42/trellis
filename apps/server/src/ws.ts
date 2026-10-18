@@ -51,7 +51,10 @@ export async function registerWs(app: FastifyInstance, session: Session): Promis
         sockets.get(clientId)?.close(4000, 'replaced by a newer connection');
         sockets.set(clientId, socket);
         session.hello(clientId, msg.name, msg.kind);
-        send(socket, session.welcome());
+        void session.welcome().then((w) => {
+          send(socket, w);
+          session.announce();
+        });
         return;
       }
       if (clientId === null) {

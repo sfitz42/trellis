@@ -80,6 +80,12 @@ export const RoadmapState = z.object({
   timeline: TimelineConfig,
   /** `${id}.${field}` → who last changed it, at which state version. Not written to Jira. */
   meta: z.record(z.string(), FieldMeta),
+  /**
+   * What Jira has been told about changes it can't store (acli can't edit due date or parent):
+   * `${epicId}.dates` → { startDate, dueDate }, `${ticketId}.epicId` → epic key. Apply posts these as
+   * comments; once acknowledged they no longer count as changes (docs/jira-mapping.md).
+   */
+  acknowledged: z.record(z.string(), z.unknown()).default({}),
   version: z.number().int().nonnegative(),
   frozen: z.object({ by: z.string(), at: z.string() }).nullable(),
 });

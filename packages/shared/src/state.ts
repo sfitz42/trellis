@@ -29,6 +29,9 @@ export function fromSnapshot(snapshot: Snapshot, opts: { today: string; timeline
     .sort((a, b) => (a.dueDate ?? '9999') .localeCompare(b.dueDate ?? '9999') || compareIds(a.id, b.id))
     .map((e) => e.id);
 
+  const acknowledged: Record<string, unknown> = {};
+  for (const e of Object.values(epics)) acknowledged[datesKey(e.id)] = { startDate: e.startDate, dueDate: e.dueDate };
+
   return {
     project: { key: snapshot.project.key, name: snapshot.project.name },
     epics,
@@ -36,9 +39,26 @@ export function fromSnapshot(snapshot: Snapshot, opts: { today: string; timeline
     epicOrder,
     timeline: opts.timeline ?? defaultTimeline(opts.today),
     meta: {},
+    acknowledged,
     version: 0,
     frozen: null,
   };
+}
+
+export interface EpicDates {
+  startDate: string | null;
+  dueDate: string | null;
+}
+
+/** `acknowledged` key for an epic's dates. */
+export const datesKey = (epicId: IssueId): string => `${epicId}.dates`;
+/** `acknowledged` key for a ticket's epic. */
+export const epicKey = (ticketId: IssueId): string => `${ticketId}.epicId`;
+
+/** The dates Jira was last told for an epic, if recorded. */
+export function acknowledgedDates(state: RoadmapState, epicId: IssueId): EpicDates | undefined {
+  const v = state.acknowledged[datesKey(epicId)] as Partial<EpicDates> | undefined;
+  return v && 'dueDate' in v ? { startDate: v.startDate ?? null, dueDate: v.dueDate ?? null } : undefined;
 }
 
 /** Compare issue ids by prefix, then number (PROJ-9 before PROJ-10). */
