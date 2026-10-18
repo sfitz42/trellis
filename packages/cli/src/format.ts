@@ -51,10 +51,20 @@ export function status(s: Status, state: RoadmapState): string {
   return lines.join('\n');
 }
 
-function links(t: Ticket): string[] {
-  // Blockers first, then what this blocks, then other link types.
+/**
+ * Every link touching `t`, whichever issue stores it (a link may be stored on one side only),
+ * as seen from `t`. Blockers first, then what this blocks, then other link types.
+ */
+function links(t: Ticket, state: RoadmapState): string[] {
+  const seen = new Map<string, Ticket['links'][number]>();
+  const add = (l: Ticket['links'][number]): void => { seen.set(`${l.type}|${l.direction}|${l.target}`, l); };
+  t.links.forEach(add);
+  for (const other of Object.values(state.tickets)) {
+    if (other.id === t.id) continue;
+    for (const l of other.links) if (l.target === t.id) add({ type: l.type, direction: l.direction === 'outward' ? 'inward' : 'outward', target: other.id });
+  }
   const rank = (l: Ticket['links'][number]): number => (l.type !== BLOCKS ? 2 : l.direction === 'inward' ? 0 : 1);
-  return [...t.links].sort((a, b) => rank(a) - rank(b) || a.target.localeCompare(b.target, undefined, { numeric: true })).map((l) => {
+  return [...seen.values()].sort((a, b) => rank(a) - rank(b) || a.target.localeCompare(b.target, undefined, { numeric: true })).map((l) => {
     if (l.type === BLOCKS) return l.direction === 'outward' ? `blocks ${l.target}` : `is blocked by ${l.target}`;
     return `${l.type.toLowerCase()}${l.direction === 'inward' ? ' (inward)' : ''} ${l.target}`;
   });
@@ -68,7 +78,7 @@ export function ticket(t: Ticket, state: RoadmapState): string {
     `  epic: ${epic ? `${epic.id} ${epic.summary}` : 'none'}`,
     `  assignee: ${t.assignee ? `${t.assignee.displayName} (${t.assignee.accountId})` : 'unassigned'}`,
     `  labels: ${v(t.labels)} · points: ${v(t.storyPoints)}`,
-    `  links: ${links(t).join('; ') || 'none'}`,
+    `  links: ${links(t, state).join('; ') || 'none'}`,
     ...(t.description ? [`  description: ${t.description.replace(/\s+/g, ' ').slice(0, 200)}`] : []),
   ].join('\n');
 }

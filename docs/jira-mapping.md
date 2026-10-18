@@ -36,7 +36,7 @@ tickets are configured. So:
 | `assignee` | `fields.assignee.accountId` / `.displayName` | Can be `null`. |
 | `labels` | `fields.labels` | |
 | `links` | `fields.issuelinks[]`: `type.name`, `outwardIssue.key` or `inwardIssue.key`, `id` | Keep the link `id`: delete needs it. |
-| Epic `dueDate` | `fields.duedate` | System field. Can be set on create (verified), but **can't be edited** (see gaps). |
+| Epic `dueDate` | `fields.duedate` | Read on pull; set on create. Afterwards Trellis-owned (acli can't edit it): changes go to Jira as comments. |
 
 ## Trellis-owned fields
 
@@ -60,7 +60,7 @@ them back.
 | Issue types | Epic (level 1); Story, Task, Bug, Feature (level 0); Subtask (level −1, out of scope for v1). |
 | Epic → child | `parent` field; `parent = <EPIC-KEY>` works in JQL. Tickets without an epic are allowed. |
 | Statuses seen | To Do, In Progress, Done on Epic, Story, Task and Bug (one simple workflow). Transitions to and from each worked, including Done → To Do on an epic. |
-| Link types | Blocks, Cloners, Duplicate, Relates. Use the **name** `Blocks`: `link create --type Blocks --out A --in B` means "A blocks B". |
+| Link types | Blocks, Cloners, Duplicate, Relates. Use the **name** `Blocks`. **Careful:** `link create --type Blocks --out A --in B` creates "**B blocks A**" (Jira REST naming: the inward issue is the blocker), although acli's success message prints "A Blocks B". Verified on the sandbox in Phase 5. |
 | Assignable users | Can't be listed with `acli` (gap). Assignees can be set by account id. |
 | Volume | Sandbox: 2 epics, 8 issues. Pull must page through results and fetch each issue (see gaps). |
 
@@ -76,7 +76,7 @@ All commands are run with `execFile` (no shell). "JSON" means the command has a 
 | (create under an epic) | `acli jira workitem create … --parent <EPIC> --json` | yes | Verified with flags. In `--from-json`, `parentIssueId` is documented "for sub-tasks only", so check whether one call can set both parent and due date in Phase 5; otherwise create with flags. |
 | `updateFields(key, fields)` | `acli jira workitem edit --key <key> [--summary] [--description] [--labels / --remove-labels] [--assignee / --remove-assignee] [--type] --yes --json` | yes | Help only. **Can't** set due date, parent or custom fields (gap). |
 | `transition(key, status)` | `acli jira workitem transition --key <key> --status "<name>" --yes --json` | yes | Verified. Target is a status **name**, not a transition id. |
-| `addLink(from, to, 'blocks')` | `acli jira workitem link create --out <from> --in <to> --type Blocks --yes` | no | Verified. Output is a single text line. |
+| `addLink(from, to, 'blocks')` | `acli jira workitem link create --out <to> --in <from> --type Blocks --yes` | no | Verified (note the reversed flags). Output is a single text line. |
 | `removeLink(...)` | `acli jira workitem link delete --id <linkId> --yes` | no | Help only (a test delete was blocked by Claude Code's auto mode). Needs the link **id**, from `issuelinks[].id` or `acli jira workitem link list --key <key> --json`. |
 | `addComment(key, body)` | `acli jira workitem comment create --key <key> --body "<text or ADF>" --json` | yes | Help only. |
 | `listTransitions(key)` | — | — | **Missing.** |
@@ -87,12 +87,16 @@ All commands are run with `execFile` (no shell). "JSON" means the command has a 
 
 ## CLI gaps (to be decided; no fallback to raw REST has been made)
 
-1. **`edit` can't change due date, parent or custom fields.** The plan's `epic.setDates` (due-date
-   part) and `ticket.move` (change of epic) can't be applied to issues that already exist. This is
-   the most important gap. Options: (a) Jira REST for just these two fields, (b) apply them by
-   hand from a checklist the apply step prints, (c) a newer `acli` if one adds it.
+1. **`edit` can't change due date, parent or custom fields.** Confirmed in Phase 5 with a probe on
+   the sandbox: `workitem edit --from-json` rejects every field name for them (`parent`,
+   `parentIssueId`, `duedate`, `additionalAttributes`…) before sending anything. **Decided:** epic
+   dates are Trellis-owned, and moving an existing ticket to another epic stays in the roadmap.
+   Apply posts both as a note in the issue's comment, and the re-pull marks them as acknowledged
+   so the changeset empties (see "Phase 5 decisions").
 2. **No way to list transitions.** The UI can't know which statuses are reachable. Workaround:
-   offer the statuses seen per type, and let apply report a rejected transition as a failed step.
+   every type offers every status seen anywhere in the project (team-managed projects usually share
+   one workflow; offering only the statuses seen per type was too strict), and apply reports a
+   rejected transition as a failed step that a rerun resumes from.
 3. **No way to list assignable users.** Workaround: offer the people already assigned to issues in
    the project (from pull), and accept typed account ids.
 4. **No way to list fields by name.** That's why start date and story points are Trellis-owned.
@@ -112,7 +116,7 @@ All commands are run with `execFile` (no shell). "JSON" means the command has a 
   Jira link id; v1 ops only edit Blocks.
 - ~~§3 `snapshot.workflow`.~~ Done in Phase 1: statuses per type with categories, the epic type
   name, people seen, and `transitions: null` when unknown (gap 2).
-- §6/§7 `epic.setDates` and `ticket.move` are blocked by gap 1 for existing issues.
+- ~~§6/§7 `epic.setDates` and `ticket.move` are blocked by gap 1.~~ Decided in Phase 5: comments + acknowledged (below).
 - §7 `packages/jira/config.json` isn't needed: nothing project-specific is hard-coded.
 
 ## Discovery scripts
@@ -124,3 +128,20 @@ All commands are run with `execFile` (no shell). "JSON" means the command has a 
 | `pnpm jira:help-audit` | Saves `--help` text for every relevant command. |
 | `pnpm jira:fixture` | Regenerates `packages/shared/fixtures/snapshot.sample.json` (all data invented). |
 | `seed-sandbox.ts` | One-off writes, approved for the sandbox: seeds an **empty** project; requires `--confirm-project`. |
+
+## Phase 5 decisions (pull and apply)
+
+| Topic | Decision |
+|---|---|
+| Epic dates | Trellis-owned, like start date. A change is relative to `acknowledged` (what Jira was last told), not the snapshot. Apply posts "Planned dates: … (was …)" as a comment. New epics still get their due date set on create. On re-pull, Jira's due date wins only if Jira changed it and Trellis didn't. |
+| Epic moves of existing tickets | Posted as a comment ("Moved to epic … on the roadmap … please move it in Jira"), acknowledged on re-pull. New tickets get their epic on create (`--parent`). |
+| Comments | Always. One per changed issue: notes for comment-only changes, plus the captured requests with who asked. |
+| Descriptions | Basic Markdown ↔ ADF (`packages/jira/src/adf.ts`): paragraphs, headings, lists, bold, italic, code, links. Richer content is flattened to text on pull; only edited descriptions are written. |
+| Drift | Dry run compares each target with live Jira. Decide per step in the Freeze screen (Keep Jira value / Overwrite → `workspace/drift-decisions.json`) or with `--on-drift skip\|overwrite`; undecided drift keeps Jira's value. Changes already in Jira are skipped. |
+| Guards | Apply needs a frozen session (`.lock`), a snapshot and changeset from `JIRA_SITE`/`JIRA_PROJECT_KEY`, and `--yes --confirm-project <KEY>` to write. Never deletes issues. |
+| Resume | Every step result is appended to `workspace/apply-log.json` immediately; a rerun skips finished steps (by changeset id + step id) and reuses created keys for `NEW-*` ids. |
+| Link direction | `acli … link create --out A --in B` creates "B blocks A". The adapter passes `--out <blocked> --in <blocker>`. |
+
+**Verified end to end on the sandbox (2026-10-18):** pull → edit (one batch with every change type)
+→ freeze → dry run → `--yes` (3 creates, field edits, a transition, link add and remove, 9 comments)
+→ pull → changeset empty → unfreeze.

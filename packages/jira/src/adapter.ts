@@ -177,8 +177,11 @@ export class AcliAdapter implements JiraAdapter {
     await this.run(['jira', 'workitem', 'transition', '--key', key, '--status', toStatus, '--yes', '--json']);
   }
 
+  /** "fromKey <type> toKey" (e.g. PROJ-1 blocks PROJ-2). */
   async addLink(fromKey: string, toKey: string, type: string): Promise<void> {
-    await this.run(['jira', 'workitem', 'link', 'create', '--out', fromKey, '--in', toKey, '--type', type, '--yes']);
+    // acli follows Jira's REST naming: the *inward* issue is the one that blocks. Verified on the
+    // sandbox: `--out A --in B --type Blocks` creates "B blocks A" (acli's own message says the reverse).
+    await this.run(['jira', 'workitem', 'link', 'create', '--out', toKey, '--in', fromKey, '--type', type, '--yes']);
   }
 
   async removeLink(linkId: string): Promise<void> {

@@ -88,7 +88,8 @@ const b1 = await create('bug 1', 'Bug', 'Seed bug: webhook retries', ['--parent'
 const t2 = await create('task 2 (no epic)', 'Task', 'Seed task: unparented chore');
 
 // 3. A blocks link: s2 blocks s3.
-await write('link s2 blocks s3', ['jira', 'workitem', 'link', 'create', '--out', s2, '--in', s3, '--type', 'Blocks', '--yes']);
+// acli: --in is the blocker, so "s2 blocks s3" is --out s3 --in s2.
+await write('link s2 blocks s3', ['jira', 'workitem', 'link', 'create', '--out', s3, '--in', s2, '--type', 'Blocks', '--yes']);
 
 // 4. Transitions, so we see more than one status.
 await write('s1 -> In Progress', ['jira', 'workitem', 'transition', '--key', s1, '--status', 'In Progress', '--yes', '--json']);

@@ -174,7 +174,7 @@ interface Epic {
   description?: string;
   status: string;                    // Jira status name
   startDate: string | null;          // Trellis-owned: not read from or written to Jira (docs/jira-mapping.md)
-  dueDate: string | null;            // Jira due date
+  dueDate: string | null;            // set in Jira on create; afterwards Trellis-owned (changes go to Jira as comments)
   ticketOrder: IssueId[];            // display order of child tickets
   color?: string;                    // optional token name for the bar
 }
@@ -326,7 +326,9 @@ ops). Dragging sends `presence.dragging`, which renders as a soft lock for other
    epic.create → ticket.create → moves (parent) → field updates → transitions → epic dates →
    link.add → link.remove.
    Each op carries `before` (snapshot value) and `after`, plus `reasons`: the `reason`/`askedBy` of
-   every agent batch that touched that item (used for optional Jira comments). Ops that cancel out
+   every agent batch that touched that item (posted as Jira comments). Epic dates and epic moves of
+   existing tickets are **comment-only** (acli can't edit due date or parent): compared with
+   `state.acknowledged` (what Jira was last told) and marked acknowledged on the re-pull. Ops that cancel out
    during the session produce nothing (diff, not op replay).
 3. **Apply** (`pnpm jira:apply`, run by the facilitator's agent on the facilitator's machine):
    - `--dry-run` (default): fetch each target's current Jira values, compare with `before`, print
@@ -337,6 +339,9 @@ ops). Dragging sends `presence.dragging`, which renders as a soft lock for other
      created. Append each result to `workspace/apply-log.json` **immediately**, so a rerun resumes
      and never repeats a completed step (idempotent by changeset id + op index).
    - Never deletes issues. `ticket.discardNew` ops never reach Jira.
+   - Always posts one comment per changed issue: notes for comment-only changes plus captured
+     requests. Writes need `--yes --confirm-project <KEY>`; the dry run writes `apply-plan.json`,
+     which the server streams to the Freeze screen; drift choices go to `drift-decisions.json`.
 4. **Re-pull** (`pnpm jira:pull`): new `snapshot.json`; the server watches it, reloads, rewrites
    NEW-* ids to real keys using `apply-log.json`, recomputes the changeset (should be empty or only
    skipped drift), and offers **Unfreeze**.
@@ -492,7 +497,7 @@ Changed vs Jira: terracotta outline on bars, 3 px inset left bar on cards, dot o
 
 - `workspace/` holds: `snapshot.json`, `roadmap.json` (mirror), `state.json` (full state incl.
   `meta`, the server's own restore file), `oplog.jsonl`, `changeset.json`, `apply-plan.json`,
-  `apply-log.json`, `.lock`, `AGENTS.md`.
+  `apply-log.json`, `drift-decisions.json`, `.lock`, `AGENTS.md`.
 - On boot: load `state.json` if present; otherwise build state from `snapshot.json`. If the snapshot
   is newer than the state's base, show a "New Jira snapshot available — reload?" prompt instead of
   auto-merging. `state.json` embeds the snapshot the session is based on, so the changeset and the

@@ -115,6 +115,9 @@ describe('writes', () => {
 
   it('adds and removes blocks links', async () => {
     expect((await t(['link', 'add', 'PROJ-126', 'blocks', 'PROJ-127'])).code).toBe(0);
+    // Stored on PROJ-126 only; both ends still show it.
+    expect((await t(['get', 'PROJ-127'])).out).toContain('links: is blocked by PROJ-126');
+    expect((await t(['get', 'PROJ-126'])).out).toContain('blocks PROJ-127');
     expect((await t(['link', 'add', 'PROJ-126', 'blocks', 'PROJ-127'])).code).toBe(3);
     expect((await t(['link', 'remove', 'PROJ-126', 'blocks', 'PROJ-127'])).code).toBe(0);
     expect((await t(['link', 'add', 'PROJ-126', 'relates', 'PROJ-127'])).code).toBe(1);

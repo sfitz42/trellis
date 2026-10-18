@@ -80,7 +80,8 @@ describe('AcliAdapter', () => {
     await a.addComment('PROJ-121', markdownToAdf('note'));
     expect(calls.map((c) => c.args.slice(0, 9))).toEqual([
       ['jira', 'workitem', 'transition', '--key', 'PROJ-121', '--status', 'Done', '--yes', '--json'],
-      ['jira', 'workitem', 'link', 'create', '--out', 'PROJ-121', '--in', 'PROJ-141', '--type'],
+      // "PROJ-121 blocks PROJ-141": acli's --in is the blocker (verified against the sandbox).
+      ['jira', 'workitem', 'link', 'create', '--out', 'PROJ-141', '--in', 'PROJ-121', '--type'],
       ['jira', 'workitem', 'link', 'delete', '--id', '10100', '--yes'],
       ['jira', 'workitem', 'comment', 'create', '--key', 'PROJ-121', '--body', JSON.stringify(markdownToAdf('note')), '--json'],
     ]);

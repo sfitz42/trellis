@@ -115,7 +115,9 @@ valid ops anyway. Stdin may also be `{ "ops": [...], "reason": "...", "askedBy":
 | `link.add` / `link.remove` | `from`, `to`, `linkType: "blocks"` ("from blocks to") |
 | `timeline.set` | `timeline: { scale: weeks\|months\|quarters\|custom, start, end }` |
 
-Start dates and story points are tracked in Trellis only; they are not written to Jira.
+Start dates and story points are tracked in Trellis only. Epic dates (after an epic exists in Jira)
+and moving an existing ticket to another epic reach Jira as a comment on the issue, because the
+Atlassian CLI can't edit those fields: tell the facilitator someone may need to move the ticket in Jira.
 
 ## Freeze and apply (end of session, when the facilitator says so)
 
