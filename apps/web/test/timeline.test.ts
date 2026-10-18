@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import type { TimelineConfig } from '@trellis/shared';
 import {
   barGeometry, columnIndex, columns, dragDates, endPosition, position, shift, timelineFrom, unitEnd, unitStart,
 } from '../src/lib/timeline.js';
 
-const months = { scale: 'months', start: '2026-10-01', end: '2027-05-31' } as const;
+const DEFAULTS = { milestones: [], showLater: true, laterLabel: 'Deliver later' };
+const tl = (t: Pick<TimelineConfig, 'scale' | 'start' | 'end'> & Partial<TimelineConfig>): TimelineConfig => ({ ...DEFAULTS, ...t });
+const months = tl({ scale: 'months', start: '2026-10-01', end: '2027-05-31' });
 
 describe('units', () => {
   it('finds unit boundaries', () => {
@@ -31,10 +34,17 @@ describe('columns', () => {
   });
 
   it('builds quarter, week and custom columns', () => {
-    expect(columns({ scale: 'quarters', start: '2026-10-01', end: '2027-09-30' }).map((c) => c.label)).toEqual(['Q4', 'Q1', 'Q2', 'Q3']);
-    expect(columns({ scale: 'weeks', start: '2026-10-14', end: '2026-10-31' })[0]?.start).toBe('2026-10-12');
-    const custom = columns({ scale: 'custom', start: '2026-10-01', end: '2027-03-31', customRanges: [{ label: 'PI 1', start: '2026-10-01', end: '2026-12-31' }] });
+    expect(columns(tl({ scale: 'quarters', start: '2026-10-01', end: '2027-09-30' })).map((c) => c.label)).toEqual(['Q4', 'Q1', 'Q2', 'Q3']);
+    expect(columns(tl({ scale: 'weeks', start: '2026-10-14', end: '2026-10-31' }))[0]?.start).toBe('2026-10-12');
+    const custom = columns(tl({ scale: 'custom', start: '2026-10-01', end: '2027-03-31', customRanges: [{ label: 'PI 1', start: '2026-10-01', end: '2026-12-31' }] }));
     expect(custom.map((c) => c.label)).toEqual(['PI 1']);
+  });
+
+  it('milestones scale: weeks up to the last milestone, or to `end` when there are none', () => {
+    // Design screen 1: w/c 19 Oct, 26 Oct, 2 Nov; the 9 Nov line closes the grid.
+    const t = tl({ scale: 'milestones', start: '2026-10-19', end: '2026-12-13', milestones: [{ id: 'm1', label: 'Delivery', date: '2026-11-09' }] });
+    expect(columns(t).map((c) => c.start)).toEqual(['2026-10-19', '2026-10-26', '2026-11-02']);
+    expect(columns({ ...t, milestones: [] })).toHaveLength(8);
   });
 });
 
@@ -80,7 +90,12 @@ describe('dragDates', () => {
 
 describe('timelineFrom', () => {
   it('starts at the unit and spans N units', () => {
-    expect(timelineFrom('2026-10-17', 'months', 8)).toEqual({ scale: 'months', start: '2026-10-01', end: '2027-05-31' });
-    expect(timelineFrom('2026-10-17', 'quarters', 4)).toEqual({ scale: 'quarters', start: '2026-10-01', end: '2027-09-30' });
+    expect(timelineFrom('2026-10-17', 'months', 8)).toEqual(tl({ scale: 'months', start: '2026-10-01', end: '2027-05-31' }));
+    expect(timelineFrom('2026-10-17', 'quarters', 4)).toEqual(tl({ scale: 'quarters', start: '2026-10-01', end: '2027-09-30' }));
+  });
+
+  it('keeps milestones and tray settings when the scale changes', () => {
+    const prev = tl({ scale: 'milestones', start: '2026-10-19', end: '2026-12-13', milestones: [{ id: 'm1', label: 'Delivery', date: '2026-11-09' }], showLater: false });
+    expect(timelineFrom('2026-10-17', 'months', 8, prev)).toMatchObject({ milestones: prev.milestones, showLater: false });
   });
 });

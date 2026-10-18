@@ -40,6 +40,7 @@ export function describeChange(op: ChangeOp, forId?: IssueId): string {
     case 'ticket.move': return forId && forId !== op.target ? `${op.target} ${op.after === forId ? 'moved in' : 'moved out'}` : `epic: ${show(op.before)} → ${show(op.after)}`;
     case 'field.update': return `${op.field}: ${show(op.before)} → ${show(op.after)}`;
     case 'transition': return `status: ${show(op.before)} → ${op.after}`;
+    case 'defer': return op.after ? 'moved to Deliver later' : 'scheduled again (out of Deliver later)';
     case 'epic.dates': return `dates: ${show(op.before.startDate)} – ${show(op.before.dueDate)} → ${show(op.after.startDate)} – ${show(op.after.dueDate)} (comment in Jira)`;
     case 'link.add': return forId === op.to ? `links: + blocked by ${op.target}` : `links: + ${op.linkType.toLowerCase()} ${op.to}`;
     case 'link.remove': return forId === op.to ? `links: − blocked by ${op.target}` : `links: − ${op.linkType.toLowerCase()} ${op.to}`;
@@ -168,11 +169,13 @@ export function describeOp(op: Op, state: RoadmapState, createdId?: IssueId): st
     case 'epic.transition': return `moved ${op.id} to ${op.status}`;
     case 'epic.reorder': return `reordered ${name(state, op.id)}`;
     case 'epic.discardNew': return `discarded new epic ${op.id}`;
+    case 'epic.defer': return op.deferred ? `moved ${name(state, op.id)} to Deliver later` : `scheduled ${name(state, op.id)} again`;
     case 'ticket.create': return `added ${createdId ?? op.tempId ?? 'a ticket'} under ${op.epicId ?? 'no epic'}`;
     case 'ticket.update': return `edited ${Object.keys(op.fields).join(', ')} of ${op.id}`;
     case 'ticket.move': return `moved ${op.id} to ${op.epicId ? name(state, op.epicId) : 'no epic'}`;
     case 'ticket.transition': return `marked ${op.id} ${op.status}`;
     case 'ticket.discardNew': return `discarded ${op.id}`;
+    case 'ticket.defer': return op.deferred ? `moved ${op.id} to Deliver later` : `scheduled ${op.id} again`;
     case 'link.add': return `linked ${op.from} blocks ${op.to}`;
     case 'link.remove': return `removed ${op.from} blocks ${op.to}`;
     case 'timeline.set': return `changed the timeline to ${op.timeline.scale}`;

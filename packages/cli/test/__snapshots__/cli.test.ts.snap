@@ -36,6 +36,7 @@ exports[`reads > get epic / ticket, auto-detecting the kind 1`] = `
       "accountId": "acc-0003",
       "displayName": "Casey Moor",
     },
+    "deferred": false,
     "epicId": "PROJ-41",
     "id": "PROJ-121",
     "issueType": "Task",

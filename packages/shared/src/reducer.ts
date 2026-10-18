@@ -105,6 +105,10 @@ export function touchedKeys(op: Op, createdId?: IssueId): string[] {
       return Object.keys(op.fields).map((f) => `${op.id}.${f}`);
     case 'epic.setDates':
       return [`${op.id}.startDate`, `${op.id}.dueDate`];
+    case 'epic.defer':
+      return [`${op.id}.deferred`, `${op.id}.startDate`, `${op.id}.dueDate`];
+    case 'ticket.defer':
+      return [`${op.id}.deferred`];
     case 'epic.transition':
     case 'ticket.transition':
       return [`${op.id}.status`];
@@ -137,7 +141,7 @@ const handlers: { [T in Op['type']]: Handler<T> } = {
     const status = f.status ?? initialStatus(ctx.workflow, epicType(ctx));
     checkStatus(ctx, epicType(ctx), null, status);
     checkDates(f.startDate ?? null, f.dueDate ?? null);
-    const e: Epic = { id, summary: f.summary, status, startDate: f.startDate ?? null, dueDate: f.dueDate ?? null, ticketOrder: [] };
+    const e: Epic = { id, summary: f.summary, status, startDate: f.startDate ?? null, dueDate: f.dueDate ?? null, ticketOrder: [], deferred: false };
     setOptional(e, 'description', f.description);
     setOptional(e, 'color', f.color);
     s.epics[id] = e;
@@ -157,6 +161,7 @@ const handlers: { [T in Op['type']]: Handler<T> } = {
 
   'epic.setDates'(s, op) {
     const e = epic(s, op.id);
+    if (e.deferred) fail('DEFERRED', `${op.id} is in Deliver later; undefer it first (one batch can do both)`);
     checkDates(op.startDate, op.dueDate);
     const inverse: Op = { type: 'epic.setDates', id: op.id, startDate: e.startDate, dueDate: e.dueDate };
     e.startDate = op.startDate;
@@ -190,7 +195,23 @@ const handlers: { [T in Op['type']]: Handler<T> } = {
     const fields: OpOf<'epic.create'>['fields'] = { summary: e.summary, status: e.status, startDate: e.startDate, dueDate: e.dueDate };
     setOptional(fields, 'description', e.description);
     setOptional(fields, 'color', e.color);
-    return { inverse: [{ type: 'epic.create', tempId: op.id, fields }, { type: 'epic.reorder', id: op.id, index }] };
+    const inverse: Op[] = [{ type: 'epic.create', tempId: op.id, fields }, { type: 'epic.reorder', id: op.id, index }];
+    if (e.deferred) inverse.push({ type: 'epic.defer', id: op.id, deferred: true });
+    return { inverse };
+  },
+
+  'epic.defer'(s, op) {
+    const e = epic(s, op.id);
+    if (e.deferred === op.deferred) return { inverse: [] };
+    const inverse: Op[] = [{ type: 'epic.defer', id: op.id, deferred: e.deferred }];
+    // Deferring clears the dates; undoing it undefers first, then restores them.
+    if (op.deferred && (e.startDate !== null || e.dueDate !== null)) {
+      inverse.push({ type: 'epic.setDates', id: op.id, startDate: e.startDate, dueDate: e.dueDate });
+      e.startDate = null;
+      e.dueDate = null;
+    }
+    e.deferred = op.deferred;
+    return { inverse };
   },
 
   'ticket.create'(s, op, ctx) {
@@ -203,7 +224,7 @@ const handlers: { [T in Op['type']]: Handler<T> } = {
     const id = newId(s, op.tempId);
     const t: Ticket = {
       id, epicId: op.epicId, issueType, summary: f.summary, status,
-      assignee: f.assignee ?? null, labels: f.labels ?? [], storyPoints: f.storyPoints ?? null, links: [],
+      assignee: f.assignee ?? null, labels: f.labels ?? [], storyPoints: f.storyPoints ?? null, links: [], deferred: false,
     };
     setOptional(t, 'description', f.description);
     s.tickets[id] = t;
@@ -277,8 +298,17 @@ const handlers: { [T in Op['type']]: Handler<T> } = {
       const [from, to] = l.direction === 'outward' ? [op.id, l.target] : [l.target, op.id];
       inverse.push({ type: 'link.add', from, to, linkType: 'blocks' });
     }
+    if (t.deferred) inverse.push({ type: 'ticket.defer', id: op.id, deferred: true });
     delete s.tickets[op.id];
     return { inverse };
+  },
+
+  'ticket.defer'(s, op) {
+    const t = ticket(s, op.id);
+    if (t.deferred === op.deferred) return { inverse: [] };
+    const inverse: Op = { type: 'ticket.defer', id: op.id, deferred: t.deferred };
+    t.deferred = op.deferred;
+    return { inverse: [inverse] };
   },
 
   'link.add'(s, op) {
@@ -302,8 +332,12 @@ const handlers: { [T in Op['type']]: Handler<T> } = {
   },
 
   'timeline.set'(s, op) {
+    const ids = op.timeline.milestones.map((m) => m.id);
+    const dup = ids.find((id, i) => ids.indexOf(id) !== i);
+    if (dup !== undefined) fail('INVALID', `milestone id ${dup} is used twice`);
     const inverse: Op = { type: 'timeline.set', timeline: s.timeline };
     s.timeline = structuredClone(op.timeline);
+    s.timeline.milestones.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
     return { inverse: [inverse] };
   },
 };

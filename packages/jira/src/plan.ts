@@ -109,6 +109,7 @@ function describe(op: ChangeOp): string {
     case 'ticket.move': return `epic ${show(op.before)} → ${show(op.after)} (as a comment: acli can't change the parent)`;
     case 'field.update': return `${op.field}: ${show(op.before)} → ${show(op.after)}`;
     case 'transition': return `status ${show(op.before)} → ${op.after}`;
+    case 'defer': return op.after ? 'move to Deliver later' : 'schedule again (out of Deliver later)';
     case 'epic.dates': return `dates ${show(op.before.startDate)} … ${show(op.before.dueDate)} → ${show(op.after.startDate)} … ${show(op.after.dueDate)} (as a comment)`;
     case 'link.add': return `link: ${op.target} ${op.linkType.toLowerCase()} ${op.to}`;
     case 'link.remove': return `unlink: ${op.target} ${op.linkType.toLowerCase()} ${op.to}`;
@@ -192,6 +193,10 @@ export async function buildPlan(cs: Changeset, snapshot: Snapshot, jira: JiraAda
       case 'transition':
         step = { ...base, action: { do: 'transition', status: op.after }, run: true };
         if (raw && op.before !== null) checkDrift(step, 'status', liveValue(raw, 'status'), op.before, op.after);
+        break;
+      case 'defer':
+        // TODO(M4): the deliver-later label and a note in the issue's comment.
+        step = { ...base, action: { do: 'comment', reasons: [] }, run: false, skipReason: 'deferral does not reach Jira yet' };
         break;
       case 'link.add': {
         step = { ...base, action: { do: 'link.add', from: op.target, to: op.to, type: op.linkType }, run: true };

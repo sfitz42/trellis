@@ -28,6 +28,30 @@ describe('rebaseOnSnapshot', () => {
     expect(keptEdits).toEqual(['PROJ-121.summary']);
   });
 
+  it('deferral merges like a core field; the changeset empties once Jira has it', () => {
+    const edited = apply(freshState(), [
+      { type: 'epic.defer', id: 'PROJ-43', deferred: true },
+      { type: 'ticket.defer', id: 'PROJ-128', deferred: true },
+    ]).state;
+    // After apply, Jira carries the label on both (its due date field is unchanged).
+    const next = jiraChanged((s) => {
+      s.epics['PROJ-43']!.deferred = true;
+      s.tickets['PROJ-128']!.deferred = true;
+    });
+    const { state, keptEdits } = rebaseOnSnapshot(edited, loadSnapshot(), next);
+    expect(state.epics['PROJ-43']).toMatchObject({ deferred: true, dueDate: null });
+    expect(state.tickets['PROJ-128']!.deferred).toBe(true);
+    expect(keptEdits).toEqual([]);
+    expect(computeChangeset(next, state).ops).toEqual([]);
+  });
+
+  it('an epic deferred in Jira loses its roadmap dates', () => {
+    const next = jiraChanged((s) => { s.epics['PROJ-44']!.deferred = true; });
+    const { state } = rebaseOnSnapshot(freshState(), loadSnapshot(), next);
+    expect(state.epics['PROJ-44']).toMatchObject({ deferred: true, startDate: null, dueDate: null });
+    expect(computeChangeset(next, state).ops).toEqual([]);
+  });
+
   it('always keeps Trellis-owned fields and ordering', () => {
     const edited = apply(freshState(), [
       { type: 'epic.setDates', id: 'PROJ-41', startDate: '2026-11-01', dueDate: '2027-02-28' },
@@ -61,10 +85,10 @@ describe('rebaseOnSnapshot', () => {
     ]).state;
     // Jira after apply: the new epic and ticket exist with real keys, linked as asked.
     const next = jiraChanged((s) => {
-      s.epics['PROJ-50'] = { id: 'PROJ-50', summary: 'Reporting', status: 'To Do', startDate: null, dueDate: null, ticketOrder: [] };
+      s.epics['PROJ-50'] = { id: 'PROJ-50', summary: 'Reporting', status: 'To Do', startDate: null, dueDate: null, ticketOrder: [], deferred: false };
       s.tickets['PROJ-301'] = {
         id: 'PROJ-301', epicId: 'PROJ-50', issueType: 'Task', summary: 'Export CSV', status: 'To Do', assignee: null, labels: [], storyPoints: null,
-        links: [{ type: 'Blocks', direction: 'outward', target: 'PROJ-121', jiraLinkId: '20001' }],
+        links: [{ type: 'Blocks', direction: 'outward', target: 'PROJ-121', jiraLinkId: '20001' }], deferred: false,
       };
     });
     const { state, renamed } = rebaseOnSnapshot(edited, loadSnapshot(), next, { 'NEW-1': 'PROJ-50', 'NEW-2': 'PROJ-301', 'NEW-9': 'PROJ-999' });

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { applyBatch, fromSnapshot, Snapshot } from '../src/index.js';
-import type { ApplyContext, Batch, BatchResult, Op, OplogEntry, RoadmapState } from '../src/index.js';
+import type { ApplyContext, Batch, BatchResult, Op, OplogEntry, RoadmapState, TimelineConfig } from '../src/index.js';
 
 const fixturePath = new URL('../fixtures/snapshot.sample.json', import.meta.url);
 
@@ -27,6 +27,11 @@ export function apply(
   const batch: Batch & { id: string } = { author: { name: 'Sam', kind: 'human' }, ops, ...batchOpts, id: batchId };
   const out = applyBatch(state, batch, { workflow: snapshot.workflow, ...ctx, batchId });
   return { ...out, entry: { batch, result: out.result, at: '2026-10-17T10:00:00Z' } };
+}
+
+/** A timeline config with the defaults for fields not given. */
+export function timeline(t: Pick<TimelineConfig, 'scale' | 'start' | 'end'> & Partial<TimelineConfig>): TimelineConfig {
+  return { milestones: [], showLater: true, laterLabel: 'Deliver later', ...t };
 }
 
 /** Item data only: drops version/meta bookkeeping so states can be compared. */

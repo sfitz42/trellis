@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeChangeset, planUndo } from '../src/index.js';
 import type { Op, RoadmapState } from '../src/index.js';
-import { apply, freshState, items, loadSnapshot } from './helpers.js';
+import { apply, freshState, items, loadSnapshot, timeline } from './helpers.js';
 
 /** Apply `ops`, then undo that batch; the roadmap should be back where it started. */
 function roundTrip(start: RoadmapState, ops: Op[]): { before: RoadmapState; after: RoadmapState } {
@@ -22,6 +22,13 @@ const withNew = (): RoadmapState =>
     { type: 'link.add', from: 'PROJ-120', to: 'NEW-2', linkType: 'blocks' },
   ]).state;
 
+const deferredEpic = (): RoadmapState => apply(freshState(), [{ type: 'epic.defer', id: 'PROJ-41', deferred: true }]).state;
+const deferredNew = (): RoadmapState =>
+  apply(freshState(), [
+    { type: 'ticket.create', tempId: 'NEW-1', epicId: 'PROJ-41', fields: { summary: 'Later' } },
+    { type: 'ticket.defer', id: 'NEW-1', deferred: true },
+  ]).state;
+
 const cases: [string, () => RoadmapState, Op[]][] = [
   ['epic.create', freshState, [{ type: 'epic.create', fields: { summary: 'E' } }]],
   ['epic.update', freshState, [{ type: 'epic.update', id: 'PROJ-41', fields: { summary: 'S', description: '', color: 'teal' } }]],
@@ -33,9 +40,16 @@ const cases: [string, () => RoadmapState, Op[]][] = [
   ['ticket.update', freshState, [{ type: 'ticket.update', id: 'PROJ-121', fields: { summary: 'S', description: 'x', assignee: null, labels: ['z'], storyPoints: 3 } }]],
   ['ticket.move', freshState, [{ type: 'ticket.move', id: 'PROJ-126', epicId: 'PROJ-44', index: 0 }]],
   ['ticket.move (no epic)', freshState, [{ type: 'ticket.move', id: 'PROJ-45', epicId: 'PROJ-41' }]],
+  ['epic.defer (restores dates)', freshState, [{ type: 'epic.defer', id: 'PROJ-41', deferred: true }]],
+  ['epic.defer + setDates (undefer)', deferredEpic, [
+    { type: 'epic.defer', id: 'PROJ-41', deferred: false },
+    { type: 'epic.setDates', id: 'PROJ-41', startDate: '2026-11-02', dueDate: '2026-11-30' },
+  ]],
+  ['ticket.defer', freshState, [{ type: 'ticket.defer', id: 'PROJ-128', deferred: true }]],
+  ['ticket.discardNew (deferred)', deferredNew, [{ type: 'ticket.discardNew', id: 'NEW-1' }]],
   ['ticket.transition', freshState, [{ type: 'ticket.transition', id: 'PROJ-121', status: 'Done' }]],
   ['link.add', freshState, [{ type: 'link.add', from: 'PROJ-126', to: 'PROJ-127', linkType: 'blocks' }]],
-  ['timeline.set', freshState, [{ type: 'timeline.set', timeline: { scale: 'weeks', start: '2026-10-01', end: '2026-12-31' } }]],
+  ['timeline.set', freshState, [{ type: 'timeline.set', timeline: timeline({ scale: 'weeks', start: '2026-10-01', end: '2026-12-31' }) }]],
 ];
 
 describe('undo inverses', () => {
@@ -52,6 +66,11 @@ describe('undo inverses', () => {
   it('link.remove restores the link (as the same link, possibly stored on one side)', () => {
     const { after } = roundTrip(freshState(), [{ type: 'link.remove', from: 'PROJ-121', to: 'PROJ-122', linkType: 'blocks' }]);
     expect(computeChangeset(loadSnapshot(), after).ops).toEqual([]);
+  });
+
+  it('has nothing to undo when the batch only re-deferred something already deferred', () => {
+    const again = apply(deferredEpic(), [{ type: 'epic.defer', id: 'PROJ-41', deferred: true }]);
+    expect(planUndo([again.entry], again.entry.batch.id)).toMatchObject({ ok: false, reason: 'NOTHING_APPLIED' });
   });
 
   it('undoes a multi-op batch in reverse order', () => {

@@ -5,5 +5,6 @@ export * from './reducer.js';
 export * from './changeset.js';
 export * from './undo.js';
 export * from './rebase.js';
+export * from './scope.js';
 export * from './protocol.js';
 export { hashString } from './hash.js';

@@ -83,6 +83,7 @@ export function toEpic(raw: RawIssue): Epic {
     startDate: null, // Trellis-owned
     dueDate: dueDateOf(raw),
     ticketOrder: [],
+    deferred: false,
   };
   const d = descriptionOf(raw);
   if (d) e.description = d;
@@ -101,6 +102,7 @@ export function toTicket(raw: RawIssue, epicKeys: ReadonlySet<string>): Ticket {
     labels: labelsOf(raw),
     storyPoints: null, // Trellis-owned
     links: linksOf(raw),
+    deferred: false,
   };
   const d = descriptionOf(raw);
   if (d) t.description = d;

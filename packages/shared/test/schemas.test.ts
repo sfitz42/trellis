@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Batch, IsoDate, IssueId, Op, Snapshot } from '../src/index.js';
+import { Batch, IsoDate, IssueId, Op, Snapshot, TimelineConfig } from '../src/index.js';
 import { loadSnapshot } from './helpers.js';
 
 describe('schemas', () => {
@@ -9,6 +9,18 @@ describe('schemas', () => {
     expect(Object.keys(s.tickets).length).toBeGreaterThanOrEqual(30);
     expect(s.workflow.epicIssueType).toBe('Epic');
     expect(s.workflow.transitions).toBeNull();
+  });
+
+  it('loads files from before milestones and deferral with the defaults', () => {
+    const raw = JSON.parse(JSON.stringify(loadSnapshot())) as { epics: Record<string, Record<string, unknown>>; tickets: Record<string, Record<string, unknown>> };
+    for (const e of Object.values(raw.epics)) delete e['deferred'];
+    for (const t of Object.values(raw.tickets)) delete t['deferred'];
+    const s = Snapshot.parse(raw);
+    expect(Object.values(s.epics).every((e) => !e.deferred)).toBe(true);
+    expect(Object.values(s.tickets).every((t) => !t.deferred)).toBe(true);
+    expect(TimelineConfig.parse({ scale: 'months', start: '2026-10-01', end: '2027-05-31' })).toEqual({
+      scale: 'months', start: '2026-10-01', end: '2027-05-31', milestones: [], showLater: true, laterLabel: 'Deliver later',
+    });
   });
 
   it('ignores unknown keys in Jira-derived data', () => {

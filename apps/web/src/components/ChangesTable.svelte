@@ -5,11 +5,11 @@
 
   const LABEL: Record<ChangeOp['kind'], string> = {
     'epic.create': 'Create', 'ticket.create': 'Create', 'ticket.move': 'Move', 'field.update': 'Update',
-    transition: 'Transition', 'epic.dates': 'Dates', 'link.add': 'Link', 'link.remove': 'Unlink',
+    transition: 'Transition', defer: 'Defer', 'epic.dates': 'Dates', 'link.add': 'Link', 'link.remove': 'Unlink',
   };
   const TONE: Record<ChangeOp['kind'], string> = {
     'epic.create': 'people', 'ticket.create': 'people', 'ticket.move': 'olive', 'field.update': 'warn',
-    transition: 'changed', 'epic.dates': 'changed', 'link.add': 'people', 'link.remove': 'error',
+    transition: 'changed', defer: 'later', 'epic.dates': 'changed', 'link.add': 'people', 'link.remove': 'error',
   };
 
   const fmt = (d: string): string => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
@@ -32,6 +32,7 @@
       case 'ticket.move': return `Parent ${v(op.before)} → ${v(op.after)} · as a Jira comment`;
       case 'field.update': return `${op.field} ${v(op.before)} → ${v(op.after)}`;
       case 'transition': return `${v(op.before)} → ${op.after}`;
+      case 'defer': return op.after ? 'Moved to Deliver later · deliver-later label' : 'Scheduled again · deliver-later label removed';
       case 'epic.dates': return `${dates(op.after, true)} (was ${dates(op.before)}) · as a Jira comment`;
       case 'link.add': return `${op.linkType.toLowerCase()} ${op.to}`;
       case 'link.remove': return `no longer ${op.linkType.toLowerCase()} ${op.to}`;
@@ -71,5 +72,6 @@
   .op.warn { background: var(--warn-tint); color: var(--warn-text); }
   .op.changed { background: var(--changed-tint); color: var(--changed-text); }
   .op.error { background: var(--error-tint); color: var(--error-text); }
+  .op.later { background: #efe3d6; color: #464a3b; }
   .empty, .more { color: var(--ink-muted); margin: 12px 14px; font-size: 13px; }
 </style>

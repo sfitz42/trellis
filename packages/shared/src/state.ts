@@ -1,12 +1,16 @@
 import type { Epic, IssueId, RoadmapState, Snapshot, Ticket, TimelineConfig, Workflow } from './schemas.js';
 import { isTempId } from './schemas.js';
 
-/** Default timeline: the month containing `today` plus the next `months - 1` months. */
-export function defaultTimeline(today: string, months = 8): TimelineConfig {
-  const [y, m] = today.split('-').map(Number) as [number, number];
-  const start = `${y}-${String(m).padStart(2, '0')}-01`;
-  const endMonth = new Date(Date.UTC(y, m - 1 + months, 0)); // last day of the final month
-  return { scale: 'months', start, end: endMonth.toISOString().slice(0, 10) };
+/**
+ * Default timeline: the milestones scale, from the Monday of `today`'s week. With no milestones yet
+ * it shows `weeks` weeks; the first milestone added sets where it ends.
+ */
+export function defaultTimeline(today: string, weeks = 8): TimelineConfig {
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  const start = d.toISOString().slice(0, 10);
+  d.setUTCDate(d.getUTCDate() + 7 * weeks - 1);
+  return { scale: 'milestones', start, end: d.toISOString().slice(0, 10), milestones: [], showLater: true, laterLabel: 'Deliver later' };
 }
 
 /**
@@ -30,7 +34,14 @@ export function fromSnapshot(snapshot: Snapshot, opts: { today: string; timeline
     .map((e) => e.id);
 
   const acknowledged: Record<string, unknown> = {};
-  for (const e of Object.values(epics)) acknowledged[datesKey(e.id)] = { startDate: e.startDate, dueDate: e.dueDate };
+  for (const e of Object.values(epics)) {
+    acknowledged[datesKey(e.id)] = { startDate: e.startDate, dueDate: e.dueDate };
+    // Deferred in Jira: no dates on the roadmap (Jira keeps its due date; acli can't clear it).
+    if (e.deferred) {
+      e.startDate = null;
+      e.dueDate = null;
+    }
+  }
 
   return {
     project: { key: snapshot.project.key, name: snapshot.project.name },

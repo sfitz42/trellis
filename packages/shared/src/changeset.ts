@@ -27,6 +27,8 @@ export type ChangeOp = Base &
     | { kind: 'ticket.move'; before: IssueId | null; after: IssueId | null }
     | { kind: 'field.update'; field: 'summary' | 'description' | 'assignee' | 'labels' | 'issueType'; before: unknown; after: unknown }
     | { kind: 'transition'; before: string | null; after: string }
+    /** Into or out of Deliver later: the `deliver-later` label in Jira, plus a note in the comment. */
+    | { kind: 'defer'; before: boolean; after: boolean }
     /** Comment-only: Trellis owns epic dates; Jira is told via a comment (acli can't edit due dates). */
     | { kind: 'epic.dates'; before: { startDate: string | null; dueDate: string | null }; after: { startDate: string | null; dueDate: string | null } }
     | { kind: 'link.add'; linkType: string; to: IssueId }
@@ -45,7 +47,7 @@ export interface Changeset {
   ops: (ChangeOp & { index: number })[];
 }
 
-const ORDER: ChangeKind[] = ['epic.create', 'ticket.create', 'ticket.move', 'field.update', 'transition', 'epic.dates', 'link.add', 'link.remove'];
+const ORDER: ChangeKind[] = ['epic.create', 'ticket.create', 'ticket.move', 'field.update', 'transition', 'defer', 'epic.dates', 'link.add', 'link.remove'];
 
 /** Changes acli can't make on existing issues: apply posts them as comments (docs/jira-mapping.md). */
 export const COMMENT_ONLY: ReadonlySet<ChangeKind> = new Set<ChangeKind>(['ticket.move', 'epic.dates']);
@@ -114,14 +116,17 @@ export function computeChangeset(snapshot: Snapshot, state: RoadmapState, oplog:
       if (e.description) after.description = e.description;
       push({ kind: 'epic.create', target: e.id, after });
       if (e.status !== initialStatus(snapshot.workflow, epicType)) push({ kind: 'transition', target: e.id, before: null, after: e.status });
+      if (e.deferred) push({ kind: 'defer', target: e.id, before: false, after: true });
       continue;
     }
     if (e.summary !== before.summary) push({ kind: 'field.update', target: e.id, field: 'summary', before: before.summary, after: e.summary });
     if (text(e.description) !== text(before.description)) push({ kind: 'field.update', target: e.id, field: 'description', before: text(before.description), after: text(e.description) });
     if (e.status !== before.status) push({ kind: 'transition', target: e.id, before: before.status, after: e.status });
+    if (e.deferred !== before.deferred) push({ kind: 'defer', target: e.id, before: before.deferred, after: e.deferred });
     // Dates are Trellis-owned: a change is relative to what Jira was last told, not the snapshot.
+    // A deferred epic has no dates; the defer note says so, so there is no separate dates change.
     const told = acknowledgedDates(state, e.id) ?? { startDate: before.startDate, dueDate: before.dueDate };
-    if (e.startDate !== told.startDate || e.dueDate !== told.dueDate) {
+    if (!e.deferred && (e.startDate !== told.startDate || e.dueDate !== told.dueDate)) {
       push({ kind: 'epic.dates', target: e.id, before: told, after: { startDate: e.startDate, dueDate: e.dueDate } });
     }
   }
@@ -137,6 +142,7 @@ export function computeChangeset(snapshot: Snapshot, state: RoadmapState, oplog:
       if (t.description) after.description = t.description;
       push({ kind: 'ticket.create', target: t.id, after });
       if (t.status !== initialStatus(snapshot.workflow, t.issueType)) push({ kind: 'transition', target: t.id, before: null, after: t.status });
+      if (t.deferred) push({ kind: 'defer', target: t.id, before: false, after: true });
       continue;
     }
     const toldEpic = state.acknowledged[epicKey(t.id)];
@@ -147,6 +153,7 @@ export function computeChangeset(snapshot: Snapshot, state: RoadmapState, oplog:
     if (!sameLabels(t.labels, before.labels)) push({ kind: 'field.update', target: t.id, field: 'labels', before: [...before.labels].sort(), after: [...t.labels].sort() });
     if (t.issueType !== before.issueType) push({ kind: 'field.update', target: t.id, field: 'issueType', before: before.issueType, after: t.issueType });
     if (t.status !== before.status) push({ kind: 'transition', target: t.id, before: before.status, after: t.status });
+    if (t.deferred !== before.deferred) push({ kind: 'defer', target: t.id, before: before.deferred, after: t.deferred });
   }
 
   // Links

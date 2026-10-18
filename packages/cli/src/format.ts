@@ -112,6 +112,7 @@ export function change(op: ChangeOp): string {
     case 'ticket.move': return `epic ${v(op.before)} → ${v(op.after)} (comment in Jira)`;
     case 'field.update': return `${op.field} ${v(op.before)} → ${v(op.after)}`;
     case 'transition': return `status ${v(op.before)} → ${op.after}`;
+    case 'defer': return op.after ? 'moved to Deliver later' : 'scheduled again (out of Deliver later)';
     case 'epic.dates': return `dates ${v(op.before.startDate)}..${v(op.before.dueDate)} → ${v(op.after.startDate)}..${v(op.after.dueDate)} (comment in Jira)`;
     case 'link.add': return `+ ${op.linkType.toLowerCase()} ${op.to}`;
     case 'link.remove': return `− ${op.linkType.toLowerCase()} ${op.to}`;

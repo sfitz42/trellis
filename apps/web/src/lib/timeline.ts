@@ -3,7 +3,7 @@
 import type { TimelineConfig } from '@trellis/shared';
 
 export type Scale = TimelineConfig['scale'];
-export type UnitScale = Exclude<Scale, 'custom'>;
+export type UnitScale = 'weeks' | 'months' | 'quarters';
 
 export interface Column {
   start: string;
@@ -57,9 +57,20 @@ export function shift(date: string, n: number, scale: UnitScale): string {
   return addMonthsClamped(date, scale === 'quarters' ? 3 * n : n);
 }
 
-/** Effective unit for a scale (custom ranges move and snap by month). */
+/** Effective unit for a scale (custom ranges move and snap by month; milestones by week). */
 export function unitOf(scale: Scale): UnitScale {
-  return scale === 'custom' ? 'months' : scale;
+  if (scale === 'custom') return 'months';
+  if (scale === 'milestones') return 'weeks';
+  return scale;
+}
+
+/**
+ * Last day shown. The milestones scale ends where the last milestone's line is drawn: at the start
+ * of its day, so the day before (docs/plans/milestones.md, M0 decision 8).
+ */
+export function lastDay(t: Pick<TimelineConfig, 'scale' | 'end' | 'milestones'>): string {
+  const last = t.milestones.at(-1);
+  return t.scale === 'milestones' && last ? addDays(last.date, -1) : t.end;
 }
 
 export function columns(t: TimelineConfig): Column[] {
@@ -67,8 +78,9 @@ export function columns(t: TimelineConfig): Column[] {
     return t.customRanges.map((r) => ({ start: r.start, end: r.end, label: r.label, sublabel: `${fmtShort(r.start)} – ${fmtShort(r.end)}` }));
   }
   const unit = unitOf(t.scale);
+  const end = lastDay(t);
   const out: Column[] = [];
-  for (let start = unitStart(t.start, unit); start <= t.end && out.length < 400; start = shift(start, 1, unit)) {
+  for (let start = unitStart(t.start, unit); start <= end && out.length < 400; start = shift(start, 1, unit)) {
     const d = parse(start);
     const year = String(d.getUTCFullYear());
     const end = unitEnd(start, unit);
@@ -161,7 +173,10 @@ export function dragDates(span: Span, mode: DragMode, units: number, scale: Scal
 export function timelineFrom(start: string, scale: Scale, count: number, prev?: TimelineConfig): TimelineConfig {
   const unit = unitOf(scale);
   const s = unitStart(start, unit);
-  const t: TimelineConfig = { scale, start: s, end: unitEnd(shift(s, count - 1, unit), unit) };
+  const t: TimelineConfig = {
+    scale, start: s, end: unitEnd(shift(s, count - 1, unit), unit),
+    milestones: prev?.milestones ?? [], showLater: prev?.showLater ?? true, laterLabel: prev?.laterLabel ?? 'Deliver later',
+  };
   if (prev?.customRanges) t.customRanges = prev.customRanges;
   return t;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeChangeset } from '../src/index.js';
 import type { OplogEntry, RoadmapState } from '../src/index.js';
-import { apply, freshState, loadSnapshot } from './helpers.js';
+import { apply, freshState, loadSnapshot, timeline } from './helpers.js';
 
 const kinds = (s: RoadmapState, log: OplogEntry[] = []) => computeChangeset(loadSnapshot(), s, log).ops.map((o) => o.kind);
 
@@ -24,7 +24,7 @@ describe('computeChangeset', () => {
       { type: 'epic.update', id: 'PROJ-41', fields: { color: 'teal' } },
       { type: 'epic.reorder', id: 'PROJ-43', index: 0 },
       { type: 'ticket.move', id: 'PROJ-128', epicId: 'PROJ-41', index: 0 },
-      { type: 'timeline.set', timeline: { scale: 'weeks', start: '2026-10-01', end: '2026-12-31' } },
+      { type: 'timeline.set', timeline: timeline({ scale: 'weeks', start: '2026-10-01', end: '2026-12-31' }) },
     ]);
     expect(kinds(state)).toEqual(['epic.dates']);
   });
@@ -65,6 +65,35 @@ describe('computeChangeset', () => {
     const cs = computeChangeset(loadSnapshot(), s2);
     expect(cs.ops.map((o) => o.index)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(cs.ops.find((o) => o.kind === 'ticket.create')).toMatchObject({ target: 'NEW-2', after: { epicId: 'NEW-1', issueType: 'Task' } });
+  });
+
+  it('puts defer after transitions and before epic dates', () => {
+    const { state } = apply(freshState(), [
+      { type: 'epic.setDates', id: 'PROJ-40', startDate: null, dueDate: '2026-11-08' },
+      { type: 'ticket.defer', id: 'PROJ-128', deferred: true },
+      { type: 'ticket.transition', id: 'PROJ-121', status: 'Done' },
+    ]);
+    expect(kinds(state)).toEqual(['transition', 'defer', 'epic.dates']);
+    expect(computeChangeset(loadSnapshot(), state).ops.find((o) => o.kind === 'defer')).toMatchObject({ target: 'PROJ-128', before: false, after: true });
+  });
+
+  it('a deferred epic shows as one defer change, not a dates change too', () => {
+    const { state } = apply(freshState(), [{ type: 'epic.defer', id: 'PROJ-43', deferred: true }]);
+    expect(kinds(state)).toEqual(['defer']);
+    // Undefer to the same dates: nothing left to tell Jira.
+    const back = apply(state, [
+      { type: 'epic.defer', id: 'PROJ-43', deferred: false },
+      { type: 'epic.setDates', id: 'PROJ-43', startDate: null, dueDate: '2027-05-31' },
+    ]).state;
+    expect(kinds(back)).toEqual([]);
+  });
+
+  it('a NEW item created deferred gets a defer change after its create', () => {
+    const { state } = apply(freshState(), [
+      { type: 'ticket.create', tempId: 'NEW-1', epicId: 'PROJ-41', fields: { summary: 'Later' } },
+      { type: 'ticket.defer', id: 'NEW-1', deferred: true },
+    ]);
+    expect(kinds(state)).toEqual(['ticket.create', 'defer']);
   });
 
   it('records before/after values and the Jira link id on removals', () => {

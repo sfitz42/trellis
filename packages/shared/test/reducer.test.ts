@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { hasBlocksLink } from '../src/index.js';
 import type { Op, Workflow } from '../src/index.js';
-import { apply, freshState, loadSnapshot } from './helpers.js';
+import { apply, freshState, loadSnapshot, timeline } from './helpers.js';
 
 const codes = (r: { rejected: { code: string }[] }): string[] => r.rejected.map((x) => x.code);
 
@@ -104,7 +104,7 @@ describe('conflicts and locks', () => {
 describe('epic ops', () => {
   it('creates with defaults and appends to epicOrder', () => {
     const { state } = apply(freshState(), [{ type: 'epic.create', fields: { summary: 'Search' } }]);
-    expect(state.epics['NEW-1']).toEqual({ id: 'NEW-1', summary: 'Search', status: 'To Do', startDate: null, dueDate: null, ticketOrder: [] });
+    expect(state.epics['NEW-1']).toEqual({ id: 'NEW-1', summary: 'Search', status: 'To Do', startDate: null, dueDate: null, ticketOrder: [], deferred: false });
     expect(state.epicOrder.at(-1)).toBe('NEW-1');
   });
 
@@ -244,8 +244,60 @@ describe('link ops', () => {
 
 describe('timeline', () => {
   it('sets the timeline', () => {
-    const timeline = { scale: 'quarters', start: '2026-10-01', end: '2027-12-31' } as const;
-    const op: Op = { type: 'timeline.set', timeline };
-    expect(apply(freshState(), [op]).state.timeline).toEqual(timeline);
+    const t = timeline({ scale: 'quarters', start: '2026-10-01', end: '2027-12-31' });
+    const op: Op = { type: 'timeline.set', timeline: t };
+    expect(apply(freshState(), [op]).state.timeline).toEqual(t);
+  });
+
+  it('sorts milestones by date and rejects duplicate ids', () => {
+    const t = timeline({
+      scale: 'milestones', start: '2026-10-19', end: '2026-12-13',
+      milestones: [{ id: 'm2', label: 'Launch', date: '2026-12-01' }, { id: 'm1', label: 'Delivery', date: '2026-11-09' }],
+    });
+    expect(apply(freshState(), [{ type: 'timeline.set', timeline: t }]).state.timeline.milestones.map((m) => m.id)).toEqual(['m1', 'm2']);
+    const dup = timeline({ ...t, milestones: [{ id: 'm1', label: 'A', date: '2026-11-09' }, { id: 'm1', label: 'B', date: '2026-12-01' }] });
+    expect(codes(apply(freshState(), [{ type: 'timeline.set', timeline: dup }]).result)).toEqual(['INVALID']);
+  });
+});
+
+describe('defer', () => {
+  it('deferring an epic clears its dates and leaves its tickets alone', () => {
+    const s = freshState();
+    const e = s.epics['PROJ-41']!;
+    expect(e.dueDate).not.toBeNull();
+    const { state, result } = apply(s, [{ type: 'epic.defer', id: 'PROJ-41', deferred: true }]);
+    expect(state.epics['PROJ-41']).toMatchObject({ deferred: true, startDate: null, dueDate: null });
+    expect(e.ticketOrder.every((id) => !state.tickets[id]!.deferred)).toBe(true);
+    expect(result.applied[0]!.touched).toEqual(['PROJ-41.deferred', 'PROJ-41.startDate', 'PROJ-41.dueDate']);
+    expect(result.applied[0]!.inverse).toEqual([
+      { type: 'epic.defer', id: 'PROJ-41', deferred: false },
+      { type: 'epic.setDates', id: 'PROJ-41', startDate: e.startDate, dueDate: e.dueDate },
+    ]);
+  });
+
+  it('a deferred epic takes no dates until undeferred; one batch can do both', () => {
+    const s = apply(freshState(), [{ type: 'epic.defer', id: 'PROJ-41', deferred: true }]).state;
+    const setDates: Op = { type: 'epic.setDates', id: 'PROJ-41', startDate: '2026-11-02', dueDate: '2026-11-30' };
+    expect(codes(apply(s, [setDates]).result)).toEqual(['DEFERRED']);
+    const { state } = apply(s, [{ type: 'epic.defer', id: 'PROJ-41', deferred: false }, setDates]);
+    expect(state.epics['PROJ-41']).toMatchObject({ deferred: false, startDate: '2026-11-02', dueDate: '2026-11-30' });
+  });
+
+  it('defers a single ticket; deferring twice is a no-op', () => {
+    const { state, result } = apply(freshState(), [
+      { type: 'ticket.defer', id: 'PROJ-128', deferred: true },
+      { type: 'ticket.defer', id: 'PROJ-128', deferred: true },
+    ]);
+    expect(state.tickets['PROJ-128']!.deferred).toBe(true);
+    expect(result.applied.map((a) => a.inverse)).toEqual([[{ type: 'ticket.defer', id: 'PROJ-128', deferred: false }], []]);
+  });
+
+  it('discarding a deferred NEW item restores the flag on undo', () => {
+    const s = apply(freshState(), [
+      { type: 'ticket.create', tempId: 'NEW-1', epicId: 'PROJ-41', fields: { summary: 'Later thing' } },
+      { type: 'ticket.defer', id: 'NEW-1', deferred: true },
+    ]).state;
+    const { result } = apply(s, [{ type: 'ticket.discardNew', id: 'NEW-1' }]);
+    expect(result.applied[0]!.inverse.at(-1)).toEqual({ type: 'ticket.defer', id: 'NEW-1', deferred: true });
   });
 });

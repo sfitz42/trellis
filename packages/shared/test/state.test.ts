@@ -40,8 +40,19 @@ describe('fromSnapshot', () => {
 });
 
 describe('helpers', () => {
-  it('builds a month-based default timeline', () => {
-    expect(defaultTimeline('2026-10-17')).toEqual({ scale: 'months', start: '2026-10-01', end: '2027-05-31' });
+  it('builds a milestones default timeline: eight weeks from this Monday, no milestones yet', () => {
+    expect(defaultTimeline('2026-10-17')).toEqual({
+      scale: 'milestones', start: '2026-10-12', end: '2026-12-06', milestones: [], showLater: true, laterLabel: 'Deliver later',
+    });
+    expect(defaultTimeline('2026-10-19').start).toBe('2026-10-19');
+  });
+
+  it('a deferred epic in Jira has no dates on the roadmap, but Jira is known to have them', () => {
+    const snap = loadSnapshot();
+    snap.epics['PROJ-43']!.deferred = true;
+    const s = fromSnapshot(snap, { today: TODAY });
+    expect(s.epics['PROJ-43']).toMatchObject({ deferred: true, startDate: null, dueDate: null });
+    expect(s.acknowledged['PROJ-43.dates']).toEqual({ startDate: null, dueDate: '2027-05-31' });
   });
 
   it('allocates the next temp id', () => {

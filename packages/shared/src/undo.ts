@@ -30,5 +30,7 @@ export function planUndo(oplog: readonly OplogEntry[], batchId: string): UndoPla
 
   // Undo the last op first; each op's own inverse list is already in run order.
   const ops = [...entry.result.applied].reverse().flatMap((a) => a.inverse);
+  // Only no-ops applied (e.g. deferring something already deferred): nothing to undo.
+  if (ops.length === 0) return { ok: false, reason: 'NOTHING_APPLIED', conflicts: [] };
   return { ok: true, ops };
 }

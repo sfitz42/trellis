@@ -20,8 +20,9 @@ export interface RebaseResult {
 }
 
 // Epic dates are Trellis-owned: merged against `acknowledged` (what Jira was told), not the snapshot.
-const EPIC_CORE = ['summary', 'description', 'status'] as const;
-const TICKET_CORE = ['epicId', 'issueType', 'summary', 'description', 'status', 'assignee', 'labels'] as const;
+// `deferred` is a core field: Jira holds it as the `deliver-later` label.
+const EPIC_CORE = ['summary', 'description', 'status', 'deferred'] as const;
+const TICKET_CORE = ['epicId', 'issueType', 'summary', 'description', 'status', 'assignee', 'labels', 'deferred'] as const;
 
 function norm(field: string, v: unknown): string {
   if (field === 'description') return JSON.stringify(v ?? '');
@@ -118,6 +119,11 @@ export function rebaseOnSnapshot(
       } else if (ours.dueDate !== theirs.dueDate) {
         keptEdits.push(`${ours.id}.dueDate`);
       }
+    }
+    // Deferred in Jira (label added there): a deferred epic has no dates in Trellis.
+    if (merged.deferred && !ours.deferred) {
+      merged.startDate = null;
+      merged.dueDate = null;
     }
     epics[theirs.id] = merged;
   }

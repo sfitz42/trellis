@@ -12,7 +12,7 @@
     { id: 'changes', label: 'Changes' },
     { id: 'activity', label: 'Activity' },
   ];
-  const DEFAULT_COUNT: Record<TimelineConfig['scale'], number> = { months: 8, quarters: 6, weeks: 16, custom: 8 };
+  const DEFAULT_COUNT: Record<TimelineConfig['scale'], number> = { milestones: 8, months: 8, quarters: 6, weeks: 16, custom: 8 };
 
   const timeline = $derived(live.state?.timeline);
   const fromMonth = $derived(timeline?.start.slice(0, 7) ?? '');

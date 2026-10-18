@@ -41,6 +41,8 @@ export const Epic = z.object({
   dueDate: IsoDate.nullable(),
   ticketOrder: z.array(IssueId),
   color: z.string().optional(),
+  /** In the Deliver later tray: no dates in Trellis. In Jira, the `deliver-later` label. */
+  deferred: z.boolean().default(false),
 });
 export type Epic = z.infer<typeof Epic>;
 
@@ -55,15 +57,27 @@ export const Ticket = z.object({
   labels: z.array(z.string()),
   storyPoints: z.number().nonnegative().nullable(), // Trellis-owned
   links: z.array(Link),
+  /** Deferred on its own (its epic may still be scheduled). */
+  deferred: z.boolean().default(false),
 });
 export type Ticket = z.infer<typeof Ticket>;
 
+/** A delivery date on the timeline: work lands on or before `date`. Lives in Trellis only. */
+export const Milestone = z.object({ id: z.string().min(1), label: z.string().min(1), date: IsoDate });
+export type Milestone = z.infer<typeof Milestone>;
+
 export const TimelineConfig = z
   .object({
-    scale: z.enum(['weeks', 'months', 'quarters', 'custom']),
+    scale: z.enum(['milestones', 'weeks', 'months', 'quarters', 'custom']),
     start: IsoDate,
+    /** Last visible date. The milestones scale ends at the last milestone instead, when there is one. */
     end: IsoDate,
     customRanges: z.array(z.object({ label: z.string(), start: IsoDate, end: IsoDate })).optional(),
+    /** Sorted by date (the reducer sorts them). */
+    milestones: z.array(Milestone).default([]),
+    showLater: z.boolean().default(true),
+    /** Display name of the tray. */
+    laterLabel: z.string().min(1).default('Deliver later'),
   })
   .refine((t) => t.start <= t.end, 'timeline start must be on or before end');
 export type TimelineConfig = z.infer<typeof TimelineConfig>;
@@ -163,11 +177,14 @@ export const Op = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('epic.reorder'), id: IssueId, index: z.number().int().nonnegative() }),
   /** Only for NEW-* epics with no tickets. Needed so `epic.create` can be undone. */
   z.strictObject({ type: z.literal('epic.discardNew'), id: IssueId }),
+  /** Into the Deliver later tray (clears the epic's dates) or back out. */
+  z.strictObject({ type: z.literal('epic.defer'), id: IssueId, deferred: z.boolean() }),
   z.strictObject({ type: z.literal('ticket.create'), tempId: IssueId.optional(), epicId: IssueId.nullable(), fields: TicketCreateFields }),
   z.strictObject({ type: z.literal('ticket.update'), id: IssueId, fields: TicketUpdateFields }),
   z.strictObject({ type: z.literal('ticket.move'), id: IssueId, epicId: IssueId.nullable(), index: z.number().int().nonnegative().optional() }),
   z.strictObject({ type: z.literal('ticket.transition'), id: IssueId, status: z.string().min(1) }),
   z.strictObject({ type: z.literal('ticket.discardNew'), id: IssueId }),
+  z.strictObject({ type: z.literal('ticket.defer'), id: IssueId, deferred: z.boolean() }),
   z.strictObject({ type: z.literal('link.add'), from: IssueId, to: IssueId, linkType: z.literal('blocks') }),
   z.strictObject({ type: z.literal('link.remove'), from: IssueId, to: IssueId, linkType: z.literal('blocks') }),
   z.strictObject({ type: z.literal('timeline.set'), timeline: TimelineConfig }),
@@ -194,7 +211,7 @@ export type Batch = z.infer<typeof Batch>;
 
 export const ERROR_CODES = [
   'FROZEN', 'INVALID', 'NOT_FOUND', 'DUPLICATE_ID', 'NOT_NEW', 'NOT_EMPTY', 'INVALID_STATUS',
-  'INVALID_TRANSITION', 'INVALID_DATES', 'SELF_LINK', 'DUPLICATE_LINK', 'LOCKED', 'STALE_FIELD',
+  'INVALID_TRANSITION', 'INVALID_DATES', 'DEFERRED', 'SELF_LINK', 'DUPLICATE_LINK', 'LOCKED', 'STALE_FIELD',
   'BATCH_REJECTED',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
