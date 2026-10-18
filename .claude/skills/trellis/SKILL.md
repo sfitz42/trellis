@@ -1,6 +1,6 @@
 ---
 name: trellis
-description: Read and edit the live Trellis roadmap session through the `trellis` CLI. Use when the facilitator asks to change the roadmap (move, split, create or re-date epics and tickets, add dependencies, change status or assignees), asks what is in the session or what differs from Jira, or asks to freeze and apply the session to Jira.
+description: Read and edit the live Trellis roadmap session through the `trellis` CLI. Use when the facilitator asks to change the roadmap (move, split, create or re-date epics and tickets, add dependencies, change status or assignees, put work in Deliver later, add or move milestones), asks what is in the session or in scope for a milestone or what differs from Jira, or asks to freeze and apply the session to Jira.
 ---
 
 # Trellis: editing the live roadmap
@@ -23,7 +23,7 @@ Add `--json` to any command for machine-readable output.
    - `--asked-by <who asked>` (defaults to `$TRELLIS_FACILITATOR`).
    Single commands (`ticket move`, `epic dates` …) are fine for one-off edits and take the same flags.
 5. **On `STALE_FIELD` ("kept the newer edit")**: someone changed that field after you read it. Re-read, then ask the facilitator rather than forcing it.
-6. **On a rejection**, read the message, fix the op (wrong id, unknown status, start after due …) and retry the batch. Don't loop more than twice without telling the facilitator.
+6. **On a rejection**, read the message, fix the op (wrong id, unknown status, start after due, `DEFERRED`: dates on an epic in Deliver later …) and retry the batch. Don't loop more than twice without telling the facilitator.
 7. **Never edit files in `workspace/` directly.** `roadmap.json` is a read-only mirror; all writes go through the CLI so they are validated and shown live.
 8. **Never run `pnpm jira:apply --yes` until the facilitator has confirmed the dry-run output in chat.** Apply only happens after `trellis freeze`.
 9. Removing a ticket that exists in Jira means transitioning it to a closed status. Only `NEW-*` items (created this session) can be discarded.
@@ -47,6 +47,8 @@ pnpm -s trellis list epics                   # ids, dates, status, ticket counts
 pnpm -s trellis list tickets --epic PROJ-42  # or --filter "payment", --epic none
 pnpm -s trellis get PROJ-140                 # epic or ticket, with links
 pnpm -s trellis snapshot-diff PROJ-140       # how one item differs from Jira (omit the id for all)
+pnpm -s trellis milestone list               # delivery dates on the timeline
+pnpm -s trellis scope                        # what makes the first milestone, what's in Deliver later, warnings
 pnpm -s trellis watch --limit 1              # wait for the next change by anyone
 ```
 
@@ -61,6 +63,10 @@ pnpm -s trellis ticket discard NEW-4
 pnpm -s trellis epic create --summary "Reporting" --due 2027-06-30
 pnpm -s trellis epic dates PROJ-43 --shift 1m          # "push it back a month"; also --start/--due YYYY-MM-DD|none
 pnpm -s trellis epic transition PROJ-43 "In Progress"
+pnpm -s trellis epic defer PROJ-43                     # into Deliver later (clears its dates)
+pnpm -s trellis epic undefer PROJ-43 --due 2027-01-31  # back out, with dates in the same batch
+pnpm -s trellis ticket defer PROJ-129                  # one ticket only; its epic stays scheduled (undefer to undo)
+pnpm -s trellis milestone add Delivery 2026-11-09      # also: milestone set m1 2026-11-16 [--label …], milestone remove m1
 pnpm -s trellis link add PROJ-121 blocks PROJ-131      # or: link remove …
 pnpm -s trellis undo b7                                 # refused if later batches touched the same fields
 ```
@@ -97,6 +103,35 @@ JSON
 Batches are atomic by default (any rejection rejects all of it); add `--non-atomic` to apply the
 valid ops anyway. Stdin may also be `{ "ops": [...], "reason": "...", "askedBy": "..." }`.
 
+## Milestones and Deliver later
+
+A milestone is a date work must land by ("Delivery · 9 Nov"). Anything that won't make it goes in
+the **Deliver later** tray: a deferred epic has no dates, and a ticket can be deferred on its own
+while its epic stays scheduled. `trellis scope` shows what makes the first milestone, what's later,
+and warnings (an epic due after its milestone, in-scope work blocked by deferred work, a blocker with
+no slack). Milestones live in Trellis only; deferral reaches Jira as the `deliver-later` label plus
+a note in the issue's comment.
+
+> Facilitator: "Notifications won't make 9 Nov, put it in deliver later."
+
+1. `pnpm -s trellis status` → version 61. `pnpm -s trellis list epics` → Notifications service is PROJ-43.
+   `pnpm -s trellis milestone list` → `m1 2026-11-09 Delivery`.
+2. One batch:
+
+```bash
+pnpm -s trellis batch --base 61 --asked-by Shaun \
+  --reason "Notifications won't make 9 Nov, put it in deliver later" <<'JSON'
+[{ "type": "epic.defer", "id": "PROJ-43", "deferred": true }]
+JSON
+```
+
+3. Run `pnpm -s trellis scope` and report the new counts and any warnings (for example, a ticket still
+   in scope that a Notifications ticket blocks).
+
+To schedule a deferred epic again, undefer it and set its dates in the same batch
+(`trellis epic undefer PROJ-43 --start … --due …`). Adding or moving a milestone is a `timeline.set`
+that carries the whole timeline: use the `milestone` commands rather than writing it by hand.
+
 ## Breaking up a ramble
 
 People think out loud: one message may hold several requests, half-decisions and asides.
@@ -131,15 +166,17 @@ People think out loud: one message may hold several requests, half-decisions and
 | `epic.transition` | `id`, `status` |
 | `epic.reorder` | `id`, `index` |
 | `epic.discardNew` | `id` (empty `NEW-*` epics only) |
+| `epic.defer` | `id`, `deferred` (`true` clears its dates; `epic.setDates` needs `false` first) |
 | `ticket.create` | `tempId?`, `epicId` (or `null`), `fields: { summary, issueType?, description?, status?, assignee?, labels?, storyPoints? }` |
 | `ticket.update` | `id`, `fields: { summary?, description?, assignee? ({accountId, displayName} or null), labels?, storyPoints?, issueType? }` |
 | `ticket.move` | `id`, `epicId` (or `null`), `index?` |
 | `ticket.transition` | `id`, `status` |
 | `ticket.discardNew` | `id` (`NEW-*` only) |
+| `ticket.defer` | `id`, `deferred` |
 | `link.add` / `link.remove` | `from`, `to`, `linkType: "blocks"` ("from blocks to") |
-| `timeline.set` | `timeline: { scale: weeks\|months\|quarters\|custom, start, end }` |
+| `timeline.set` | `timeline: { scale: milestones\|weeks\|months\|quarters\|custom, start, end, milestones: [{ id, label, date }], showLater, laterLabel }` |
 
-Start dates and story points are tracked in Trellis only. Epic dates (after an epic exists in Jira)
+Start dates, story points and milestones are tracked in Trellis only. Epic dates (after an epic exists in Jira)
 and moving an existing ticket to another epic reach Jira as a comment on the issue, because the
 Atlassian CLI can't edit those fields: tell the facilitator someone may need to move the ticket in Jira.
 

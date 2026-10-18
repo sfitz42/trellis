@@ -53,6 +53,20 @@ describe('boot and persistence', () => {
     expect(body.batchId).toBe('b2');
   });
 
+  it('restores a state.json written before milestones and deferral, with the defaults', async () => {
+    const r = await server();
+    await r.session.flush();
+    await r.stop();
+    const file = JSON.parse(await readFile(join(r.dir, 'state.json'), 'utf8')) as { state: { timeline: Record<string, unknown>; epics: Record<string, Record<string, unknown>> } };
+    file.state.timeline = { scale: 'months', start: '2026-10-01', end: '2027-05-31' };
+    for (const e of Object.values(file.state.epics)) delete e['deferred'];
+    await writeFile(join(r.dir, 'state.json'), JSON.stringify(file));
+    running = await start({ dir: r.dir, seed: false });
+    const { body: state } = await running.http<RoadmapState>('GET', '/api/state');
+    expect(state.timeline).toMatchObject({ scale: 'months', milestones: [], showLater: true, laterLabel: 'Deliver later' });
+    expect(state.epics['PROJ-41']?.deferred).toBe(false);
+  });
+
   it('starts empty without a snapshot', async () => {
     const r = await server({ seed: false, projectKey: 'ABC' });
     const { body } = await r.http<Status>('GET', '/api/status');
@@ -87,6 +101,33 @@ describe('websocket collaboration', () => {
     const seen = await james.next('batch.applied');
     expect(seen.batch.author.name).toBe('Priya');
     expect(seen.results.applied[0]?.op).toEqual({ type: 'ticket.move', id: 'PROJ-126', epicId: 'PROJ-44' });
+  });
+
+  it('one agent batch defers an epic and adds a milestone; browsers see both', async () => {
+    const r = await server();
+    const priya = await client(r, 'Priya');
+    const { body: before } = await r.http<RoadmapState>('GET', '/api/state');
+    const timeline = { ...before.timeline, scale: 'milestones', milestones: [{ id: 'm1', label: 'Delivery', date: '2026-11-09' }] };
+    const { status, body } = await r.http<BatchResult>('POST', '/api/batch', {
+      author: agent, reason: "Notifications won't make 9 Nov, put it in deliver later", askedBy: 'Shaun', baseVersion: 0,
+      ops: [{ type: 'timeline.set', timeline }, { type: 'epic.defer', id: 'PROJ-43', deferred: true }],
+    });
+    expect(status).toBe(200);
+    expect(body.applied).toHaveLength(2);
+    const seen = await priya.next('batch.applied');
+    expect(seen.results.applied.map((a) => a.op.type)).toEqual(['timeline.set', 'epic.defer']);
+    const { body: after } = await r.http<RoadmapState>('GET', '/api/state');
+    expect(after.timeline.milestones).toEqual([{ id: 'm1', label: 'Delivery', date: '2026-11-09' }]);
+    expect(after.epics['PROJ-43']).toMatchObject({ deferred: true, dueDate: null });
+    const { body: cs } = await r.http<Changeset>('GET', '/api/changeset');
+    expect(cs.ops.map((o) => `${o.kind} ${o.target}`)).toEqual(['defer PROJ-43']);
+  });
+
+  it('rejects dates on a deferred epic with DEFERRED', async () => {
+    const r = await server();
+    await r.http('POST', '/api/batch', { author: agent, ops: [{ type: 'epic.defer', id: 'PROJ-43', deferred: true }] });
+    const { body } = await r.http<BatchResult>('POST', '/api/batch', { author: agent, ops: [{ type: 'epic.setDates', id: 'PROJ-43', startDate: null, dueDate: '2027-01-31' }] });
+    expect(body.rejected.map((x) => x.code)).toEqual(['DEFERRED']);
   });
 
   it('reports rejected ops to the sender only, for optimistic rollback', async () => {

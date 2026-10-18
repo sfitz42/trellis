@@ -124,6 +124,88 @@ describe('writes', () => {
   });
 });
 
+describe('deliver later, milestones and scope', () => {
+  it('defers and undefers epics; dates come back only when given', async () => {
+    const r = await t(['epic', 'defer', 'PROJ-43', '--reason', "Notifications won't make 9 Nov"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('✓ epic.defer PROJ-43 → Deliver later');
+    expect(state().epics['PROJ-43']).toMatchObject({ deferred: true, startDate: null, dueDate: null });
+    expect((await t(['get', 'PROJ-43'])).out).toMatch(/^PROJ-43 · Epic · To Do · Deliver later/);
+    expect((await t(['list', 'epics'])).out).toMatch(/PROJ-43\s+Deliver later/);
+    // Dates on a deferred epic: rejected with a hint; undefer can set them in the same batch.
+    const dates = await t(['epic', 'dates', 'PROJ-43', '--due', '2027-01-31']);
+    expect(dates.code).toBe(3);
+    expect(dates.out).toContain('[DEFERRED]');
+    expect((await t(['epic', 'undefer', 'PROJ-43', '--start', '2026-12-01', '--due', '2027-01-31'])).code).toBe(0);
+    expect(state().epics['PROJ-43']).toMatchObject({ deferred: false, startDate: '2026-12-01', dueDate: '2027-01-31' });
+  });
+
+  it('defers a single ticket while its epic stays scheduled', async () => {
+    expect((await t(['ticket', 'defer', 'PROJ-128'])).code).toBe(0);
+    expect(state().tickets['PROJ-128']?.deferred).toBe(true);
+    expect((await t(['get', 'PROJ-128'])).out).toMatch(/^PROJ-128 · \w+ · To Do · Deliver later/);
+    expect((await t(['list', 'tickets', '--epic', 'PROJ-41'])).out).toMatch(/PROJ-128 .*\[Deliver later\]/);
+    expect((await t(['ticket', 'undefer', 'PROJ-128'])).code).toBe(0);
+    expect(state().tickets['PROJ-128']?.deferred).toBe(false);
+  });
+
+  it('adds, moves, lists and removes milestones', async () => {
+    expect((await t(['milestone', 'list'])).out).toContain('no milestones');
+    expect((await t(['milestone', 'add', 'Launch', '2026-12-01'])).code).toBe(0);
+    expect((await t(['milestone', 'add', 'Delivery', '2026-11-09'])).code).toBe(0);
+    expect((await t(['milestone', 'list'])).out).toBe('m2    2026-11-09  Delivery\nm1    2026-12-01  Launch');
+    expect((await t(['milestone', 'set', 'm1', '2026-12-14', '--label', 'Go live'])).code).toBe(0);
+    expect(state().timeline.milestones.at(-1)).toEqual({ id: 'm1', label: 'Go live', date: '2026-12-14' });
+    expect((await t(['milestone', 'remove', 'm2'])).code).toBe(0);
+    expect((await t(['milestone', 'list', '--json'])).json()).toEqual([{ id: 'm1', label: 'Go live', date: '2026-12-14' }]);
+    // The next free id is reused; unknown ids and "none" dates are refused.
+    await t(['milestone', 'add', 'Delivery', '2026-11-09']);
+    expect(state().timeline.milestones.map((m) => m.id)).toEqual(['m2', 'm1']);
+    expect((await t(['milestone', 'set', 'm9', '2026-11-09'])).code).toBe(3);
+    expect((await t(['milestone', 'add', 'X', 'none'])).code).toBe(1);
+    expect((await t(['milestone', 'add', 'X', '2026-11-09', '--id', 'm1'])).code).toBe(3);
+  });
+
+  it('milestone edits keep a newer human timeline change (base defaults to the version read)', async () => {
+    const human = server.session.submit({
+      author: { name: 'Priya', kind: 'human' },
+      ops: [{ type: 'timeline.set', timeline: { ...state().timeline, scale: 'weeks' } }],
+    });
+    expect(human.applied).toHaveLength(1);
+    // An explicit older --base: Priya's newer timeline edit is kept.
+    const stale = await t(['milestone', 'add', 'Launch', '2026-12-01', '--base', '0']);
+    expect(stale.code).toBe(3);
+    expect(stale.out).toContain('kept the newer edit');
+    // By default the base is the version just read (v1, after Priya): it applies and keeps her scale.
+    expect((await t(['milestone', 'add', 'Delivery', '2026-11-09'])).code).toBe(0);
+    expect(state().timeline).toMatchObject({ scale: 'weeks', milestones: [{ id: 'm1' }] });
+  });
+
+  it('scope: counts against the first milestone, with warnings; JSON too', async () => {
+    const empty = await t(['scope']);
+    expect(empty.out).toContain('No milestones yet');
+    await t(['batch'], {
+      stdin: JSON.stringify([
+        { type: 'timeline.set', timeline: { ...state().timeline, scale: 'milestones', milestones: [{ id: 'm1', label: 'Delivery', date: '2026-11-09' }] } },
+        { type: 'epic.setDates', id: 'PROJ-40', startDate: '2026-10-19', dueDate: '2026-11-01' },
+        { type: 'epic.defer', id: 'PROJ-43', deferred: true },
+        { type: 'ticket.defer', id: 'PROJ-128', deferred: true },
+      ]),
+    });
+    const r = await t(['scope']);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('By Delivery (2026-11-09): 1 epic(s) · 7 ticket(s)');
+    expect(r.out).toContain('Deliver later: 1 epic(s) · 7 ticket(s)');
+    expect(r.out).toContain('tickets on their own: PROJ-128');
+    expect(r.out).toContain('! PROJ-103 is still scheduled but blocked by PROJ-161, which is in Deliver later.');
+    const json = (await t(['scope', '--json'])).json() as { milestone: { id: string }; later: { epics: string[] }; warnings: { kind: string }[] };
+    expect(json.milestone.id).toBe('m1');
+    expect(json.later.epics).toEqual(['PROJ-43']);
+    expect(json.warnings.map((w) => w.kind)).toContain('blockedByLater');
+    expect((await t(['scope', '--milestone', 'm9'])).code).toBe(3);
+  });
+});
+
 describe('batch', () => {
   // The Phase 4 acceptance request, as an agent would send it: one batch, reason captured.
   const split = {
@@ -158,6 +240,30 @@ describe('batch', () => {
     expect(live.results.applied).toHaveLength(7);
     browser.close();
     expect(state().epics['PROJ-42']?.ticketOrder.slice(-3)).toEqual(['NEW-1', 'NEW-2', 'NEW-3']);
+  });
+
+  it('one batch defers an epic and adds a milestone; a browser sees both', async () => {
+    const browser = new WebSocket(`${server.url.replace('http', 'ws')}/ws`);
+    const seen = new Promise<Extract<ServerMessage, { type: 'batch.applied' }>>((resolve) => {
+      browser.on('message', (d: Buffer) => {
+        const m = JSON.parse(d.toString()) as ServerMessage;
+        if (m.type === 'batch.applied') resolve(m);
+      });
+    });
+    await new Promise((r) => browser.once('open', r));
+    browser.send(JSON.stringify({ type: 'hello', name: 'Shaun', kind: 'human', clientId: 'browser' }));
+
+    const timeline = { ...state().timeline, scale: 'milestones', milestones: [{ id: 'm1', label: 'Delivery', date: '2026-11-09' }] };
+    const r = await t(['batch', '--base', '0', '--reason', "Notifications won't make 9 Nov, put it in deliver later"], {
+      stdin: JSON.stringify([{ type: 'timeline.set', timeline }, { type: 'epic.defer', id: 'PROJ-43', deferred: true }]),
+    });
+    expect(r.code).toBe(0);
+    const live = await seen;
+    browser.close();
+    expect(live.results.applied.map((a) => a.op.type)).toEqual(['timeline.set', 'epic.defer']);
+    expect(live.batch.reason).toBe("Notifications won't make 9 Nov, put it in deliver later");
+    expect(state().timeline.milestones).toEqual([{ id: 'm1', label: 'Delivery', date: '2026-11-09' }]);
+    expect(state().epics['PROJ-43']?.deferred).toBe(true);
   });
 
   it('accepts a bare JSON array, and flags override the input', async () => {

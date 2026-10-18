@@ -1,5 +1,7 @@
 // Human-readable output. `--json` bypasses all of this and prints the API's JSON.
-import type { BatchResult, ChangeOp, Changeset, Epic, Op, RoadmapState, ServerMessage, Status, Ticket } from '@trellis/shared';
+import type {
+  BatchResult, ChangeOp, Changeset, Epic, Op, RoadmapState, ScopeBucket, ScopeSummary, ScopeWarning, ServerMessage, Status, Ticket,
+} from '@trellis/shared';
 import { BLOCKS } from '@trellis/shared';
 
 const v = (x: unknown): string => {
@@ -23,8 +25,10 @@ export function opSummary(op: Op): string {
     case 'ticket.move': return `ticket.move ${op.id} → ${op.epicId ?? 'no epic'}${op.index !== undefined ? ` @${op.index}` : ''}`;
     case 'link.add':
     case 'link.remove': return `${op.type} ${op.from} blocks ${op.to}`;
-    case 'timeline.set': return `timeline.set ${op.timeline.scale} ${op.timeline.start} → ${op.timeline.end}`;
+    case 'timeline.set': return `timeline.set ${op.timeline.scale} ${op.timeline.start} → ${op.timeline.end}${op.timeline.milestones.length ? ` · milestones ${op.timeline.milestones.map((m) => `${m.label} ${m.date}`).join(', ')}` : ''}`;
     case 'epic.reorder': return `epic.reorder ${op.id} @${op.index}`;
+    case 'epic.defer':
+    case 'ticket.defer': return `${op.type} ${op.id} → ${op.deferred ? 'Deliver later' : 'scheduled'}`;
     default: return `${op.type} ${op.id}${'fields' in op ? ` ${Object.keys(op.fields).join(',')}` : ''}`;
   }
 }
@@ -72,8 +76,9 @@ function links(t: Ticket, state: RoadmapState): string[] {
 
 export function ticket(t: Ticket, state: RoadmapState): string {
   const epic = t.epicId ? state.epics[t.epicId] : undefined;
+  const later = t.deferred ? ' · Deliver later' : epic?.deferred ? ' · Deliver later (with its epic)' : '';
   return [
-    `${t.id} · ${t.issueType} · ${t.status}`,
+    `${t.id} · ${t.issueType} · ${t.status}${later}`,
     `  ${t.summary}`,
     `  epic: ${epic ? `${epic.id} ${epic.summary}` : 'none'}`,
     `  assignee: ${t.assignee ? `${t.assignee.displayName} (${t.assignee.accountId})` : 'unassigned'}`,
@@ -85,24 +90,47 @@ export function ticket(t: Ticket, state: RoadmapState): string {
 
 export function epic(e: Epic, tickets: Ticket[]): string {
   return [
-    `${e.id} · Epic · ${e.status} · ${v(e.startDate)} → ${v(e.dueDate)}`,
+    `${e.id} · Epic · ${e.status} · ${when(e)}`,
     `  ${e.summary}`,
     ...(e.description ? [`  description: ${e.description.replace(/\s+/g, ' ').slice(0, 200)}`] : []),
     `  tickets (${tickets.length}):`,
-    ...tickets.map((t) => `    ${t.id.padEnd(9)} ${t.status.padEnd(12)} ${t.summary}`),
+    ...tickets.map((t) => `    ${t.id.padEnd(9)} ${t.status.padEnd(12)} ${t.summary}${t.deferred ? '  [Deliver later]' : ''}`),
   ].join('\n');
 }
+
+/** Dates, or "Deliver later" for a deferred epic (it has none). */
+const when = (e: Epic): string => (e.deferred ? 'Deliver later' : `${v(e.startDate)} → ${v(e.dueDate)}`);
 
 export function epicList(state: RoadmapState): string {
   return state.epicOrder.flatMap((id) => {
     const e = state.epics[id];
-    return e ? [`${e.id.padEnd(9)} ${`${v(e.startDate)} → ${v(e.dueDate)}`.padEnd(25)} ${e.status.padEnd(12)} ${String(e.ticketOrder.length).padStart(3)} tickets  ${e.summary}`] : [];
+    return e ? [`${e.id.padEnd(9)} ${when(e).padEnd(25)} ${e.status.padEnd(12)} ${String(e.ticketOrder.length).padStart(3)} tickets  ${e.summary}`] : [];
   }).join('\n');
+}
+
+export function milestones(state: RoadmapState): string {
+  const list = state.timeline.milestones;
+  if (list.length === 0) return 'no milestones (add one: trellis milestone add <label> <YYYY-MM-DD>)';
+  return list.map((m) => `${m.id.padEnd(5)} ${m.date}  ${m.label}`).join('\n');
+}
+
+export function scope(s: ScopeSummary, warnings: ScopeWarning[], state: RoadmapState): string {
+  const count = (b: ScopeBucket): string => `${b.epics.length} epic(s) · ${b.tickets.length} ticket(s)`;
+  const epics = (b: ScopeBucket): string => b.epics.map((id) => `${id} ${state.epics[id]?.summary ?? ''}`).join('; ') || '—';
+  const loose = (b: ScopeBucket): string[] => b.tickets.filter((id) => !b.epics.includes(state.tickets[id]?.epicId ?? ''));
+  const lines = s.milestone
+    ? [`By ${s.milestone.label} (${s.milestone.date}): ${count(s.by)}`, `  epics: ${epics(s.by)}`]
+    : ['No milestones yet (trellis milestone add <label> <YYYY-MM-DD>)'];
+  lines.push(`${state.timeline.laterLabel}: ${count(s.later)}`, `  epics: ${epics(s.later)}`);
+  if (loose(s.later).length) lines.push(`  tickets on their own: ${loose(s.later).join(', ')}`);
+  lines.push(`${s.milestone ? 'After it, or not placed' : 'Not placed'}: ${count(s.other)}`, `  epics: ${epics(s.other)}`);
+  if (warnings.length) lines.push(`Warnings (${warnings.length}):`, ...warnings.map((w) => `  ! ${w.message}`));
+  return lines.join('\n');
 }
 
 export function ticketList(tickets: Ticket[]): string {
   if (tickets.length === 0) return 'no tickets match';
-  return tickets.map((t) => `${t.id.padEnd(9)} ${t.issueType.padEnd(8)} ${t.status.padEnd(12)} ${(t.epicId ?? '—').padEnd(9)} ${t.summary}`).join('\n');
+  return tickets.map((t) => `${t.id.padEnd(9)} ${t.issueType.padEnd(8)} ${t.status.padEnd(12)} ${(t.epicId ?? '—').padEnd(9)} ${t.summary}${t.deferred ? '  [Deliver later]' : ''}`).join('\n');
 }
 
 export function change(op: ChangeOp): string {

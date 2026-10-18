@@ -136,7 +136,7 @@ Stop for review after each phase. Each one ends with `pnpm typecheck`, `pnpm lin
 - Confirm whether the Atlassian CLI can set labels.
 - List conflicts with this plan and a file-by-file change list.
 
-**M1 · Model**
+**M1 · Model** ✅ done 18 Oct 2026
 - Types, zod schemas, the two defer ops, the timeline config, the reducer, validation and undo.
 - Scope summary and warning helpers in `@trellis/shared`.
 - Changeset ordering.
@@ -144,7 +144,7 @@ Stop for review after each phase. Each one ends with `pnpm typecheck`, `pnpm lin
 - ✅ Done when unit tests cover defer and undefer, the cleared epic dates, scope counts and
   ordering.
 
-**M2 · Server and CLI**
+**M2 · Server and CLI** ✅ done 18 Oct 2026
 - The ops end to end through the server.
 - The new CLI commands with `--json` and exit codes.
 - Skill and `AGENTS.md` updates.

@@ -110,7 +110,7 @@ export function scopeWarnings(state: RoadmapState, today: string): ScopeWarning[
     const b = state.tickets[blocked];
     if (!a || !b || ticketIsLater(state, b)) continue;
     if (ticketIsLater(state, a)) {
-      out.push({ kind: 'blockedByLater', id: blocked, blocker, message: `${blocked} is in scope but blocked by ${blocker}, which is in Deliver later.` });
+      out.push({ kind: 'blockedByLater', id: blocked, blocker, message: `${blocked} is still scheduled but blocked by ${blocker}, which is in Deliver later.` });
       continue;
     }
     const ea = a.epicId !== null ? state.epics[a.epicId] : undefined;

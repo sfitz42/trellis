@@ -1,7 +1,8 @@
 // The `trellis` command (PLAN.md §8). `run()` never calls process.exit: it returns the exit code,
 // so tests can drive it with fake stdin/stdout.
 import { Command, CommanderError, Option } from 'commander';
-import type { Author, Batch, Op, RoadmapState, ServerMessage } from '@trellis/shared';
+import type { Author, Batch, Milestone, Op, RoadmapState, ScopeSummary, ServerMessage } from '@trellis/shared';
+import { scopeSummary, scopeWarnings } from '@trellis/shared';
 import {
   parseDate, parseList, parseNumberOrNone, parseOpsInput, parseShift, parseTtl, resolvePerson, shiftDate,
 } from './args.js';
@@ -19,6 +20,10 @@ export interface Io {
   /** Resolves when the user interrupts `watch` (Ctrl-C). */
   interrupted?: Promise<void>;
 }
+
+const fail = (exitCode: ExitCode, message: string): never => {
+  throw new CliError(exitCode, message);
+};
 
 interface WriteOpts {
   reason?: string;
@@ -230,6 +235,23 @@ export async function run(argv: string[], io: Io): Promise<ExitCode> {
     },
   );
 
+  withWriteFlags(epic.command('defer').description('move to Deliver later (clears its dates; its tickets keep their own flags)').argument('<id>')).action(
+    async (id: string, o: WriteOpts) => { await write([{ type: 'epic.defer', id, deferred: true }], o); },
+  );
+
+  withWriteFlags(epic.command('undefer').description('take out of Deliver later, optionally with new dates').argument('<id>'))
+    .option('--start <date>', 'YYYY-MM-DD')
+    .option('--due <date>', 'YYYY-MM-DD')
+    .action(async (id: string, o: WriteOpts & { start?: string; due?: string }) => {
+      const ops: Op[] = [{ type: 'epic.defer', id, deferred: false }];
+      if (o.start !== undefined || o.due !== undefined) {
+        const startDate = o.start !== undefined ? parseDate(o.start, '--start') : null;
+        const dueDate = o.due !== undefined ? parseDate(o.due, '--due') : null;
+        ops.push({ type: 'epic.setDates', id, startDate, dueDate });
+      }
+      await write(ops, o);
+    });
+
   // --- tickets
 
   const ticket = program.command('ticket').description('create or change tickets');
@@ -307,6 +329,81 @@ export async function run(argv: string[], io: Io): Promise<ExitCode> {
   withWriteFlags(ticket.command('discard').description('remove a NEW-* ticket that only exists in Trellis').argument('<id>')).action(
     async (id: string, o: WriteOpts) => { await write([{ type: 'ticket.discardNew', id }], o); },
   );
+
+  withWriteFlags(ticket.command('defer').description('move this ticket alone to Deliver later (its epic stays scheduled)').argument('<id>')).action(
+    async (id: string, o: WriteOpts) => { await write([{ type: 'ticket.defer', id, deferred: true }], o); },
+  );
+
+  withWriteFlags(ticket.command('undefer').description('take this ticket out of Deliver later').argument('<id>')).action(
+    async (id: string, o: WriteOpts) => { await write([{ type: 'ticket.defer', id, deferred: false }], o); },
+  );
+
+  // --- milestones and scope
+
+  const milestone = program.command('milestone').description('delivery dates on the timeline (Trellis only, not in Jira)');
+
+  milestone.command('list').description('milestones by date').action(async () => {
+    const st = await state();
+    print(st.timeline.milestones, () => fmt.milestones(st));
+  });
+
+  /** Change the milestone list as one timeline.set; --base defaults to the version just read. */
+  async function editMilestones(o: WriteOpts, edit: (list: Milestone[], st: RoadmapState) => Milestone[]): Promise<void> {
+    const st = await state();
+    const timeline = { ...st.timeline, milestones: edit(st.timeline.milestones.map((m) => ({ ...m })), st) };
+    await write([{ type: 'timeline.set', timeline }], { ...o, base: o.base ?? String(st.version) });
+  }
+  const findIn = (list: Milestone[], id: string): Milestone =>
+    list.find((m) => m.id === id) ?? fail(EXIT.rejected, `no milestone ${id} (known: ${list.map((m) => m.id).join(', ') || 'none'})`);
+  const requireDate = (value: string, what: string): string => parseDate(value, what) ?? fail(EXIT.usage, `${what} must be a date, not "none"`);
+
+  withWriteFlags(milestone.command('add').description('add a milestone, e.g. trellis milestone add Delivery 2026-11-09').argument('<label>').argument('<date>'))
+    .option('--id <id>', 'choose the id (default: next m<n>)')
+    .action(async (label: string, date: string, o: WriteOpts & { id?: string }) => {
+      const d = requireDate(date, '<date>');
+      await editMilestones(o, (list) => {
+        const used = new Set(list.map((m) => m.id));
+        if (o.id !== undefined && used.has(o.id)) fail(EXIT.rejected, `milestone ${o.id} already exists`);
+        let n = 1;
+        while (used.has(`m${n}`)) n++;
+        return [...list, { id: o.id ?? `m${n}`, label, date: d }];
+      });
+    });
+
+  withWriteFlags(milestone.command('set').description('move a milestone to a new date').argument('<id>').argument('<date>'))
+    .option('--label <text>', 'rename it too')
+    .action(async (id: string, date: string, o: WriteOpts & { label?: string }) => {
+      const d = requireDate(date, '<date>');
+      await editMilestones(o, (list) => {
+        const m = findIn(list, id);
+        m.date = d;
+        if (o.label !== undefined) m.label = o.label;
+        return list;
+      });
+    });
+
+  withWriteFlags(milestone.command('remove').description('remove a milestone').argument('<id>')).action(async (id: string, o: WriteOpts) => {
+    await editMilestones(o, (list) => {
+      findIn(list, id);
+      return list.filter((m) => m.id !== id);
+    });
+  });
+
+  program
+    .command('scope')
+    .description('what makes a milestone, what is in Deliver later, and warnings')
+    .option('--milestone <id>', 'count against this milestone (default: the first)')
+    .action(async (o: { milestone?: string }) => {
+      const st = await state();
+      let summary: ScopeSummary;
+      try {
+        summary = scopeSummary(st, o.milestone);
+      } catch (err) {
+        throw new CliError(EXIT.rejected, (err as Error).message);
+      }
+      const warnings = scopeWarnings(st, new Date().toISOString().slice(0, 10));
+      print({ ...summary, warnings }, () => fmt.scope(summary, warnings, st));
+    });
 
   // --- links
 
