@@ -149,3 +149,6 @@ Atlassian CLI can't edit those fields: tell the facilitator someone may need to 
 2. `pnpm jira:apply --dry-run` → show the facilitator the plan and any drift. **Wait for their confirmation.**
 3. `pnpm jira:apply --yes --confirm-project <KEY>` → apply.
 4. `pnpm jira:pull` → Trellis re-pulls; the changeset should be empty. The facilitator unfreezes.
+
+Starting a new roadmap (archiving the old one) is the facilitator's call: `pnpm session:new --label <name>`
+with Trellis stopped. Never move or delete workspace files yourself.

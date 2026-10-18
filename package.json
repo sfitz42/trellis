@@ -23,7 +23,10 @@
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f trellis",
-    "seed": "pnpm --silent --filter @trellis/jira exec tsx --conditions=development src/seed.ts"
+    "seed": "pnpm --silent --filter @trellis/jira exec tsx --conditions=development src/seed.ts",
+    "session:new": "pnpm --silent --filter @trellis/jira exec tsx --conditions=development src/session.ts new",
+    "session:list": "pnpm --silent --filter @trellis/jira exec tsx --conditions=development src/session.ts list",
+    "session:restore": "pnpm --silent --filter @trellis/jira exec tsx --conditions=development src/session.ts restore"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

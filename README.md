@@ -110,6 +110,8 @@ At the end:
    resumes and never repeats a finished step.
 10. **`pnpm jira:pull`**: Trellis re-pulls automatically while frozen; the changeset should be empty.
 11. **Unfreeze**.
+12. When you're done with this roadmap: stop Trellis and `pnpm session:new --label <name>` to archive
+    it, so the next session starts clean (see below).
 
 What reaches Jira, and how:
 
@@ -121,6 +123,28 @@ What reaches Jira, and how:
 - Every changed issue gets one comment with the captured requests ("… asked by Shaun").
 - Start dates and story points stay in Trellis.
 
+## Starting a new roadmap (and keeping the old one)
+
+The server always resumes the session in `workspace/` (`state.json`), and a new Jira pull is merged
+into it. To start a fresh roadmap instead, archive the current session:
+
+```bash
+# stop Trellis first (Ctrl-C, or pnpm docker:down)
+pnpm session:new --label q1-planning --pull   # archive the old session, pull Jira fresh
+pnpm dev                                      # or pnpm docker:up: builds a clean roadmap
+```
+
+- The old session moves to `workspace/archive/<date>-<label>/`: `state.json`, `roadmap.json`, the
+  batch log, changeset, apply plan and log, drift decisions, plus a copy of its snapshot and a
+  `meta.json` (project, version, number of batches, whether it was applied to Jira).
+- Without `--pull` the current `snapshot.json` stays for the new session; use `pnpm seed` for sample data.
+- `pnpm session:list` shows the current session and every archive, newest first.
+- `pnpm session:restore <name>` brings an archived session back (the current one is archived first;
+  the archive itself stays). Start Trellis to carry on with it.
+- Both refuse while a Trellis server is using the workspace (it would save over the change) or
+  while the session is frozen; `--force` overrides.
+- Archives are gitignored like the rest of `workspace/`: they hold real Jira data.
+
 ## Scripts
 
 | Command | What it does |
@@ -129,6 +153,7 @@ What reaches Jira, and how:
 | `pnpm build` / `pnpm start` | production build / run the built server |
 | `pnpm typecheck` / `pnpm lint` / `pnpm test` | `tsc -b` + `svelte-check` / ESLint / Vitest (all must pass) |
 | `pnpm seed [--force]` | sample snapshot into the workspace |
+| `pnpm session:new [--label] [--pull]` / `session:list` / `session:restore <name>` | archive the session and start fresh / list / bring one back |
 | `pnpm jira:auth` / `jira:pull` / `jira:apply` | check `acli`, pull the project, apply the frozen changeset |
 | `pnpm -s trellis …` | the agent CLI (`pnpm -s trellis --help`) |
 | `pnpm docker:up` / `docker:down` / `docker:logs` | Compose |
