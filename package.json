@@ -19,7 +19,11 @@
     "jira:fixture": "pnpm --filter @trellis/jira exec tsx src/discovery/make-fixture.ts",
     "trellis": "pnpm --silent --filter @trellis/cli trellis",
     "jira:pull": "pnpm --silent --filter @trellis/jira exec tsx --conditions=development src/pull.ts",
-    "jira:apply": "pnpm --silent --filter @trellis/jira exec tsx --conditions=development src/apply.ts"
+    "jira:apply": "pnpm --silent --filter @trellis/jira exec tsx --conditions=development src/apply.ts",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f trellis",
+    "seed": "pnpm --silent --filter @trellis/jira exec tsx --conditions=development src/seed.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

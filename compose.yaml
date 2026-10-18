@@ -1,0 +1,26 @@
+# Run Trellis on a laptop or a LAN box: `pnpm docker:up`, then open http://<this machine>:8080.
+# Do NOT scale this service: one process holds the live session (README, "Why one instance").
+services:
+  trellis:
+    build: .
+    image: trellis:local
+    ports: ["${PORT:-8080}:8080"]
+    env_file:
+      - path: .env          # JIRA_PROJECT_KEY etc.; optional for the server
+        required: false
+    environment:
+      WORKSPACE_DIR: /workspace
+      HOST: 0.0.0.0
+      PORT: 8080
+      # Docker Desktop on macOS/Windows may not deliver file events across the bind mount.
+      WATCH_POLL: ${WATCH_POLL:-0}
+    volumes:
+      # A bind mount, not a named volume: `pnpm jira:pull` / `jira:apply` and the facilitator's
+      # agent run on the host and must read and write the same files.
+      - ./workspace:/workspace
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/status"]
+      interval: 15s
+      timeout: 3s
+      retries: 3

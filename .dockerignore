@@ -1,10 +1,15 @@
+# Keep the build context small and free of local or real data (PLAN.md §11).
 node_modules
 **/node_modules
-workspace/
+dist
+**/dist
+**/*.tsbuildinfo
+.git
+# Secrets and real Jira data never enter the image.
 .env
 .env.*
 !.env.example
-dist
-**/dist
-.git
-*.tsbuildinfo
+workspace/
+# Local tooling output
+.playwright-mcp/
+coverage/
