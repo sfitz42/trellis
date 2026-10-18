@@ -1,7 +1,7 @@
 # Trellis — Project Brief
 
 > Exported from the live doc [Trellis — Project Brief](https://claude.ai/code/artifact/faa633ff-b2bb-4ca5-a758-2ea2bda6e3fe)
-> on 2026-10-18 (rev 26). The live doc is the source; re-export when it changes.
+> on 2026-10-18 (rev 27). The live doc is the source; re-export when it changes.
 
 Oct 17, 2026 · @Shaun
 
@@ -105,5 +105,5 @@ All seven phases are built. Phase 5 was verified end to end against the sandbox 
 Open questions:
 
 - Should captured requests also be posted as comments on the Jira tickets they changed? Decided: yes, always (one comment per changed issue).
-- Will we later want agents to edit `roadmap.json` directly, or a request box in the app?
+- Will we later want agents to edit `roadmap.json` directly, or a request box in the app? Decided: no, agents use the CLI only; roadmap.json stays a read-only mirror.
 - When we move beyond the LAN, which sign-in do we use (for example Entra on Azure Container Apps)?
