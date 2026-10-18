@@ -111,12 +111,24 @@ export interface Span {
 }
 
 /** How a bar for these dates is drawn: left/width in column units, and which ends are real. */
-export function barGeometry(span: Span, cols: readonly Column[], scale: Scale): { left: number; width: number; hasStart: boolean; hasDue: boolean } | null {
+/**
+ * Where to draw an epic that has no start date (common: Jira has none; it's Trellis-owned).
+ * With `today`: from the current unit to the due date ("in flight until due"); without, or if the
+ * due date is already past: one unit ending at the due date.
+ */
+export function implicitStart(due: string, scale: Scale, today?: string): string {
+  const unit = unitOf(scale);
+  const own = unitStart(due, unit);
+  if (!today) return own;
+  const now = unitStart(today, unit);
+  return now < own ? now : own;
+}
+
+export function barGeometry(span: Span, cols: readonly Column[], scale: Scale, today?: string): { left: number; width: number; hasStart: boolean; hasDue: boolean } | null {
   if (span.dueDate === null && span.startDate === null) return null;
   const unit = unitOf(scale);
   const due = span.dueDate ?? unitEnd(span.startDate as string, unit);
-  // No start date (common: it's Trellis-owned): draw one unit ending at the due date.
-  const start = span.startDate ?? unitStart(due, unit);
+  const start = span.startDate ?? implicitStart(due, scale, today);
   const left = position(start, cols);
   return { left, width: Math.max(endPosition(due, cols) - left, 0.15), hasStart: span.startDate !== null, hasDue: span.dueDate !== null };
 }
@@ -127,11 +139,12 @@ export type DragMode = 'move' | 'start' | 'end';
  * New dates after dragging a bar by `units` scale units (whole units only: drags snap).
  * `move` shifts both ends; `start`/`end` resize one end and never cross the other.
  */
-export function dragDates(span: Span, mode: DragMode, units: number, scale: Scale): Span {
+export function dragDates(span: Span, mode: DragMode, units: number, scale: Scale, today?: string): Span {
   const unit = unitOf(scale);
   const geo = { start: span.startDate, due: span.dueDate };
   const baseDue = geo.due ?? (geo.start ? unitEnd(geo.start, unit) : null);
-  const baseStart = geo.start ?? (baseDue ? unitStart(baseDue, unit) : null);
+  // Dragging an epic without a start date gives it one, from where it is drawn.
+  const baseStart = geo.start ?? (baseDue ? implicitStart(baseDue, scale, today) : null);
   if (baseStart === null || baseDue === null) return span;
   if (mode === 'move') {
     return { startDate: unitStart(shift(baseStart, units, unit), unit), dueDate: unitEnd(shift(baseDue, units, unit), unit) };

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { applyBatch, computeChangeset, fromSnapshot, Snapshot } from '@trellis/shared';
 import type { Op, RoadmapState } from '@trellis/shared';
 import {
-  backwardsWarnings, changesByItem, dependenciesOf, describeChange, describeOp, initials, revertOps,
+  backwardsWarnings, changesByItem, dependenciesOf, describeChange, describeOp, idsOfOp, initials, revertOps,
 } from '../src/lib/items.js';
 
 const snapshot = Snapshot.parse(JSON.parse(readFileSync(new URL('../../../packages/shared/fixtures/snapshot.sample.json', import.meta.url), 'utf8')));
@@ -73,6 +73,11 @@ describe('describeOp', () => {
     expect(describeOp({ type: 'ticket.move', id: 'PROJ-126', epicId: 'PROJ-41' }, s)).toBe('moved PROJ-126 to Data migration');
     expect(describeOp({ type: 'ticket.create', epicId: 'PROJ-41', fields: { summary: 'x' } }, s, 'NEW-1')).toBe('added NEW-1 under PROJ-41');
     expect(describeOp({ type: 'epic.setDates', id: 'PROJ-41', startDate: null, dueDate: '2027-03-31' }, s)).toBe('set Data migration to … – Mar');
+  });
+
+  it('marks a new ticket and its epic as touched (agent highlight)', () => {
+    expect(idsOfOp({ type: 'ticket.create', epicId: 'PROJ-42', fields: { summary: 'x' } }, 'NEW-1')).toEqual(['PROJ-42', 'NEW-1']);
+    expect(idsOfOp({ type: 'ticket.move', id: 'PROJ-126', epicId: 'PROJ-41' })).toEqual(['PROJ-126', 'PROJ-41']);
   });
 
   it('makes initials, with AI for agents', () => {

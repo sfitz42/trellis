@@ -14,7 +14,8 @@
   const rm = $derived(live.roadmap);
   const cols = $derived(columns(rm.timeline));
   let width = $state(1000);
-  const colW = $derived(Math.max(96, (width - 250) / Math.max(cols.length, 1)));
+  // Whole pixels: fractional widths add up to more than the frame and force a scrollbar.
+  const colW = $derived(Math.max(96, Math.floor((width - 250) / Math.max(cols.length, 1))));
   const nowIdx = $derived(columnIndex(todayIso(), cols));
   const changes = $derived(changesByItem(live.changeset));
   const NO_EPIC = '__none__';
@@ -101,7 +102,7 @@
 
     {#each rows as r (r.id)}
       {@const open = ui.expanded.includes(r.id) || (filtering && r.shown.length > 0)}
-      {@const geo = barGeometry(r.epic, cols, rm.timeline.scale)}
+      {@const geo = barGeometry(r.epic, cols, rm.timeline.scale, todayIso())}
       {#if !filtering || r.shown.length > 0 || r.epic.summary.toLowerCase().includes(ui.filter.toLowerCase())}
         <div class="label-col row-label" class:open data-epic-row={r.id}>
           <button class="toggle" aria-expanded={open} aria-label="{open ? 'Hide' : 'Show'} tickets in {r.epic.summary}" onclick={() => { ui.toggle(r.id); }}>
@@ -135,7 +136,8 @@
             <span class="undated">No dates yet · open the epic to set them</span>
           {/if}
           {#if open}
-            <div class="cards" style:margin-left="{Math.max(0, (geo?.left ?? 0) * colW)}px">
+            <!-- Under the bar, but kept inside the grid so the two columns of cards are never clipped. -->
+            <div class="cards" style:margin-left="{Math.max(0, Math.min((geo?.left ?? 0) * colW, cols.length * colW - 470))}px">
               {#each r.shown as t (t.id)}
                 <TicketCard
                   ticket={t}

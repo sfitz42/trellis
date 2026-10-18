@@ -89,7 +89,7 @@ workspace/snapshot.json · {pulledAt}
 workspace/.lock · frozen</code></pre>
     <span class="label">Commands</span>
     <pre class="cmds"><code>pnpm jira:apply --dry-run
-pnpm jira:apply --yes
+pnpm jira:apply --yes --confirm-project {live.state?.project.key ?? 'KEY'}
 pnpm jira:pull</code></pre>
     <span class="label">Apply log</span>
     {#if log.length}

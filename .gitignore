@@ -153,3 +153,6 @@ vite.config.ts.timestamp-*
 workspace/*
 !workspace/README.md
 !workspace/AGENTS.md
+
+# Playwright MCP output (screenshots, snapshots)
+.playwright-mcp/

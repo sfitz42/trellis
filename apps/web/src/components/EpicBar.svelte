@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Claim, Epic } from '@trellis/shared';
   import { barGeometry, dragDates, fmtRange } from '../lib/timeline.js';
+  import { todayIso } from '../lib/view.js';
   import type { Column, DragMode, Scale, Span } from '../lib/timeline.js';
 
   let {
@@ -22,9 +23,12 @@
   } = $props();
 
   let drag = $state<{ mode: DragMode; x0: number; units: number } | null>(null);
+  const today = todayIso();
 
-  const span = $derived(drag ? dragDates(epic, drag.mode, drag.units, scale) : { startDate: epic.startDate, dueDate: epic.dueDate });
-  const geo = $derived(barGeometry(span, cols, scale));
+  const span = $derived(drag ? dragDates(epic, drag.mode, drag.units, scale, today) : { startDate: epic.startDate, dueDate: epic.dueDate });
+  const geo = $derived(barGeometry(span, cols, scale, today));
+  /** Too narrow for its name: show the name just outside the bar instead. */
+  const narrow = $derived(geo !== null && geo.width * colW < 150);
 
   function down(e: PointerEvent, mode: DragMode): void {
     if (lock || e.button !== 0) return;
@@ -39,7 +43,7 @@
   }
   function up(): void {
     if (!drag) return;
-    const next = dragDates(epic, drag.mode, drag.units, scale);
+    const next = dragDates(epic, drag.mode, drag.units, scale, today);
     const moved = drag.units !== 0;
     drag = null;
     ondrag(false);
@@ -51,7 +55,7 @@
     const dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
     if (dir !== 0) {
       e.preventDefault();
-      ondates(dragDates(epic, e.shiftKey ? 'end' : e.altKey ? 'start' : 'move', dir, scale));
+      ondates(dragDates(epic, e.shiftKey ? 'end' : e.altKey ? 'start' : 'move', dir, scale, today));
     } else if (e.key === 'Enter') {
       e.preventDefault();
       ontoggle();
@@ -72,6 +76,7 @@
     class:locked={!!lock}
     class:dragging={!!drag}
     class:open-start={!geo.hasStart}
+    class:narrow
     style:left="{geo.left * colW}px"
     style:width="{geo.width * colW}px"
     role="slider"
@@ -87,17 +92,19 @@
     ondblclick={ontoggle}
   >
     <span class="handle start" aria-hidden="true" onpointerdown={(e) => { down(e, 'start'); }}></span>
-    <span class="name">{epic.summary}</span>
-    {#if lock}
-      <span class="tag people">{lock.holder} {lock.kind === 'drag' ? 'moving' : 'editing'}</span>
-    {:else if agent}
-      <span class="tag agent">agent</span>
-    {:else if isNew}
-      <span class="tag changed">new</span>
-    {/if}
+    <span class="label">
+      <span class="name">{epic.summary}</span>
+      {#if lock}
+        <span class="tag people">{lock.holder} {lock.kind === 'drag' ? 'moving' : 'editing'}</span>
+      {:else if agent}
+        <span class="tag agent">agent</span>
+      {:else if isNew}
+        <span class="tag changed">new</span>
+      {/if}
+    </span>
     {#if drag}
       <span class="when">{fmtRange(span)}</span>
-    {:else}
+    {:else if !narrow}
       <span class="count">{count} tickets</span>
     {/if}
     <span class="handle end" aria-hidden="true" onpointerdown={(e) => { down(e, 'end'); }}></span>
@@ -134,6 +141,11 @@
   .bar.locked { outline: 2px solid var(--people); outline-offset: 2px; cursor: not-allowed; }
   .bar.open-start { border-left: 2px dashed currentColor; }
   .name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  /* Too narrow for the name: the label sits just outside the bar, in normal text colour. */
+  .bar.narrow { overflow: visible; }
+  .bar.narrow .label { position: absolute; left: calc(100% + 10px); color: var(--ink); white-space: nowrap; }
+  .bar.narrow .name { overflow: visible; }
   .count, .when { margin-left: auto; font-size: 12px; white-space: nowrap; opacity: 0.85; }
   .handle { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
   .handle.start { left: 0; }

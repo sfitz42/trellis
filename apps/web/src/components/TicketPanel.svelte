@@ -187,7 +187,7 @@
       {/if}
     </div>
 
-    <section class="differs" aria-label="Differs from Jira snapshot">
+    <section class="differs" class:same={!isNew(t.id) && changes.length === 0} aria-label="Differs from Jira snapshot">
       {#if isNew(t.id)}
         <strong>New ticket</strong>
         <p>Only in Trellis so far. It is created in Jira at apply.</p>
@@ -237,6 +237,7 @@
   .add { justify-self: start; border-style: dashed; }
   .link-form { display: grid; grid-template-columns: 130px 1fr auto auto; gap: 6px; }
   .differs { margin-top: auto; background: var(--changed-tint); border-radius: 8px; padding: 14px; display: grid; gap: 8px; }
+  .differs.same { background: var(--line); }
   .differs ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 12.5px; }
   .differs p { margin: 0; color: var(--ink-muted); font-size: 13px; }
   .differs .btn { justify-self: start; }

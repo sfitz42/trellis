@@ -12,6 +12,13 @@
     transition: 'changed', 'epic.dates': 'changed', 'link.add': 'people', 'link.remove': 'error',
   };
 
+  const fmt = (d: string): string => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  /** "Start 1 Nov 2026, due 31 Mar 2027", as in the design. */
+  const dates = (d: { startDate: string | null; dueDate: string | null }, cap = false): string => {
+    const text = [d.startDate ? `start ${fmt(d.startDate)}` : null, d.dueDate ? `due ${fmt(d.dueDate)}` : null].filter(Boolean).join(', ') || 'no dates';
+    return cap ? text.replace(/^./, (c) => c.toUpperCase()) : text;
+  };
+
   function change(op: ChangeOp): string {
     const v = (x: unknown): string => {
       if (x === null || x === undefined || x === '') return '—';
@@ -25,7 +32,7 @@
       case 'ticket.move': return `Parent ${v(op.before)} → ${v(op.after)} · as a Jira comment`;
       case 'field.update': return `${op.field} ${v(op.before)} → ${v(op.after)}`;
       case 'transition': return `${v(op.before)} → ${op.after}`;
-      case 'epic.dates': return `${v(op.after.startDate)} → ${v(op.after.dueDate)} (was ${v(op.before.startDate)} → ${v(op.before.dueDate)}) · as a Jira comment`;
+      case 'epic.dates': return `${dates(op.after, true)} (was ${dates(op.before)}) · as a Jira comment`;
       case 'link.add': return `${op.linkType.toLowerCase()} ${op.to}`;
       case 'link.remove': return `no longer ${op.linkType.toLowerCase()} ${op.to}`;
     }

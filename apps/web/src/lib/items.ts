@@ -185,6 +185,8 @@ export function idsOfOp(op: Op, createdId?: IssueId): IssueId[] {
   if ('id' in op) ids.push(op.id);
   if ('from' in op) ids.push(op.from, op.to);
   if (op.type === 'ticket.move' && op.epicId) ids.push(op.epicId);
+  // Adding a ticket changes its epic too (the design marks the epic's bar as agent-touched).
+  if (op.type === 'ticket.create' && op.epicId) ids.push(op.epicId);
   if (createdId) ids.push(createdId);
   return ids;
 }

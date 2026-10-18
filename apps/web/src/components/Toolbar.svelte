@@ -59,14 +59,14 @@
 </div>
 
 <style>
-  .bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
   .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
   .seg button { min-height: var(--touch); padding: 0 14px; border: 0; background: transparent; }
   .seg button.on { background: var(--structure); color: var(--structure-ink); font-weight: 600; }
   .inline { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-muted); font-size: 13px; }
-  .inline .input { width: auto; min-width: 120px; color: var(--ink); }
-  .from { min-width: 150px; }
-  .filter { position: relative; display: inline-flex; align-items: center; flex: 1 1 220px; max-width: 280px; }
+  .inline .input { width: auto; min-width: 110px; color: var(--ink); }
+  .from { min-width: 140px; }
+  .filter { position: relative; display: inline-flex; align-items: center; flex: 1 1 150px; min-width: 150px; max-width: 280px; }
   .filter svg { position: absolute; left: 12px; color: var(--ink-muted); }
   .filter .input { padding-left: 36px; }
   .spacer { flex: 1; }

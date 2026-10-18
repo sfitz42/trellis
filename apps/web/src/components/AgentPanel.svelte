@@ -78,9 +78,10 @@
   .rejected { margin: 0; padding: 10px 12px; background: var(--error-tint); border: 1px solid var(--error); border-radius: var(--radius); color: var(--error-text); font-size: 13.5px; }
   .ran span { font-size: 12px; color: var(--ink-muted); }
   pre { margin: 6px 0 0; padding: 12px; background: #2f3128; color: #f2e1d2; border-radius: var(--radius); font-size: 12px; overflow: auto; white-space: pre-wrap; }
-  .ok { color: #b9d3c4; }
-  .bad { color: #e7a99c; }
-  .kp { color: #b7c9cf; }
+  /* Light tints on the dark command box (contrast ≥ 7:1). */
+  pre .ok { color: #d5e8db; font-weight: 600; }
+  pre .bad { color: #f4c0b5; font-weight: 600; }
+  pre .kp { color: #d0e2e6; font-weight: 600; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .json { max-height: 300px; }
 </style>
