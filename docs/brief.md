@@ -1,7 +1,7 @@
 # Trellis — Project Brief
 
 > Exported from the live doc [Trellis — Project Brief](https://claude.ai/code/artifact/faa633ff-b2bb-4ca5-a758-2ea2bda6e3fe)
-> on 2026-10-17 (rev 12). The live doc is the source; re-export when it changes.
+> on 2026-10-18 (rev 26). The live doc is the source; re-export when it changes.
 
 Oct 17, 2026 · @Shaun
 
@@ -30,11 +30,13 @@ Everything before Freeze happens only in Trellis; Jira changes once, in the Appl
 | Agent access | `trellis` CLI, not direct file edits; `roadmap.json` is a read-only mirror | Each change is validated instantly and the agent gets clear errors |
 | Who runs the agent | Whoever is facilitating; no request box in the app for now | Keeps the app simple and agent-free |
 | Captured requests | Every agent batch stores the request in plain words and who asked | We keep a record of why things changed |
+| Jira comments | Every changed issue gets one comment with the captured requests and who asked | The record of why things changed lives in Jira too |
 | Time axis | Configurable scale (months by default; quarters, weeks or custom), not sprints | We don't work to sprints; epics store real dates |
-| Jira mapping | Timeline = epic start and due dates; Jira Cloud, company-managed | Matches how our project is set up |
-| Jira access | Scripts wrap the facilitator's Atlassian CLI; agent can also use the CLI skill for one-offs | One login, consistent behaviour |
-| Safety | Dry run first, drift check, resumable apply; never deletes issues; extra flag for the real project | Nothing reaches Jira by accident |
-| Config | `JIRA_SITE`, `JIRA_PROJECT_KEY`, `JIRA_SANDBOX_KEY` as env vars | No real keys in code or git |
+| Jira mapping | Timeline = epic start and due dates, owned by Trellis (date changes reach Jira as comments); Jira Cloud, team- or company-managed | Matches how our project is set up; the Atlassian CLI can't edit due dates or a ticket's epic |
+| Jira access | Scripts wrap the facilitator's Atlassian CLI; Jira changes only through freeze, dry run and apply | One login; what the room agreed is exactly what reaches Jira |
+| Safety | Dry run first, drift check, resumable apply; never deletes issues; an explicit project confirmation on every apply | Nothing reaches Jira by accident |
+| Drift | The dry run checks live Jira first; keep Jira's value or overwrite it, per change, on the Freeze screen | Nobody's direct Jira edit is lost by surprise |
+| Config | `JIRA_SITE`, `JIRA_PROJECT_KEY` as env vars | No real keys in code or git |
 | Hosting | Local or LAN, no login for now; Docker Compose; single instance | Fits a meeting-room tool; live state is in memory |
 
 ## Design screens
@@ -55,10 +57,10 @@ Each colour means one thing, so a glance tells you who changed what. The base is
 | Colour | Hex | Means |
 | --- | --- | --- |
 | Cream | `#FFE8D6` (page tint `#FFF3E8`) | Page background |
-| Tan | `#DDBEA9` | Borders, lines, one epic fill |
-| Olive | `#6B705C` | Structure: buttons, headers, the frozen bar |
+| Tan | `#DDBEA9` | One epic fill; borders use a lighter #E6CDB9 and row lines #F2E1D2 |
+| Olive | `#4F5343` | Structure: buttons, headers, the frozen bar (the palette's #6B705C, darkened so white text passes contrast) |
 | Teal | `#3E6A70` | People: presence, selection, soft locks |
-| Terracotta | `#CB997E` | Differs from the Jira snapshot |
+| Terracotta | `#CB997E` | Differs from the Jira snapshot (outlines #B97A58, borders #CB997E) |
 | Plum | `#8E6C8A`, dotted outline | Changed by the facilitator's agent |
 | Ochre | `#C9963A` | Now marker, warnings, drift |
 | Brick | `#9E4436` | Errors and rejected edits |
@@ -81,7 +83,7 @@ It runs with `pnpm dev`, or `docker compose up` on a laptop or LAN box. The work
 
 ## Build phases
 
-Claude Code builds Trellis in seven phases, stopping for review after each. The full spec is `docs/PLAN.md` in the repo; `KICKOFF_PROMPT.md` holds the prompt that starts Phase 0 and the prompts for later phases.
+Claude Code builds Trellis in seven phases, stopping for review after each. The full spec is `docs/PLAN.md` in the repo; docs/`KICKOFF_PROMPT.md` holds the prompt that starts Phase 0 and the prompts for later phases.
 
 1. **Phase 0 · Jira discovery.** Read-only look at our project: field ids, workflows, link types, what the Atlassian CLI can and can't do. Also sets up the empty monorepo.
 2. **Phase 1 · Shared model.** Data types, validation, edit logic, changeset logic, tests.
@@ -91,15 +93,17 @@ Claude Code builds Trellis in seven phases, stopping for review after each. The 
 6. **Phase 5 · Jira pull and apply.** Tested end to end against the sandbox project only.
 7. **Phase 6 · Packaging.** Dockerfile, Docker Compose, README and the facilitator runbook.
 
+All seven phases are built. Phase 5 was verified end to end against the sandbox Jira project: pull, edit, freeze, dry run, apply, re-pull, empty changeset.
+
 ## Open questions and next steps
 
-- [ ] Create the repo, add `docs/PLAN.md`, the `.env` and the exported screens
-- [ ] Pick or create the sandbox Jira project for testing
-- [ ] Run Phase 0 and review what the Atlassian CLI can't do
+- [x] Create the repo, add `docs/PLAN.md`, the `.env` and the exported screens
+- [x] Pick the sandbox Jira project (for now it is the project Trellis uses)
+- [x] Run Phase 0 and review what the Atlassian CLI can't do
 - [ ] Share the design canvas and this brief with the team
 
 Open questions:
 
-- Should captured requests also be posted as comments on the Jira tickets they changed?
+- Should captured requests also be posted as comments on the Jira tickets they changed? Decided: yes, always (one comment per changed issue).
 - Will we later want agents to edit `roadmap.json` directly, or a request box in the app?
 - When we move beyond the LAN, which sign-in do we use (for example Entra on Azure Container Apps)?

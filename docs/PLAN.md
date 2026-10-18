@@ -18,6 +18,7 @@ real-time editor, a CLI, and a pair of Jira scripts.
 | **Project brief** | [Trellis — Project Brief](https://claude.ai/code/artifact/faa633ff-b2bb-4ca5-a758-2ea2bda6e3fe) (live doc) · exported to `docs/brief.md` | The why: problem, session flow, key decisions with reasoning, visual language, open questions. Read it before this plan. |
 | **Design screens** | [Trellis Screens canvas](https://claude.ai/artifact/Tc86u1GSQqM1Y6pPLUTWuz) · exported to `docs/design/*.png` | The visual reference for §9. |
 | **This plan** | `docs/PLAN.md` | The how: architecture, schemas, protocol, phases. |
+| **Kickoff prompts** | `docs/KICKOFF_PROMPT.md` | The prompt that starts Phase 0, and the prompts for later phases. |
 
 The links are for people; they are private until shared. Agents can't open them, so they work
 from the exported copies in `docs/`. If the brief and this plan disagree, **this plan wins** for
