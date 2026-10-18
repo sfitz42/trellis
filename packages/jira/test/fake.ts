@@ -4,6 +4,7 @@ import { Snapshot } from '@trellis/shared';
 import { markdownToAdf } from '../src/adf.js';
 import type { AdfDoc } from '../src/adf.js';
 import type { CreateInput, JiraAdapter, ProjectInfo, RawIssue, UpdateInput } from '../src/adapter.js';
+import { LATER_LABEL } from '../src/normalize.js';
 
 export const fixture = (): Snapshot =>
   Snapshot.parse(JSON.parse(readFileSync(new URL('../../shared/fixtures/snapshot.sample.json', import.meta.url), 'utf8')));
@@ -27,14 +28,18 @@ export class FakeJira implements JiraAdapter {
   static fromSnapshot(s: Snapshot): FakeJira {
     const j = new FakeJira(s.project.key, s.project.name);
     for (const e of Object.values(s.epics)) {
-      j.issues.set(e.id, j.raw(e.id, 'Epic', e.summary, e.status, { duedate: e.dueDate, description: e.description ? markdownToAdf(e.description) : null }));
+      j.issues.set(e.id, j.raw(e.id, 'Epic', e.summary, e.status, {
+        duedate: e.dueDate,
+        description: e.description ? markdownToAdf(e.description) : null,
+        labels: e.deferred ? [LATER_LABEL] : [],
+      }));
     }
     for (const t of Object.values(s.tickets)) {
       if (t.assignee) j.people.set(t.assignee.accountId, t.assignee.displayName);
       j.issues.set(t.id, j.raw(t.id, t.issueType, t.summary, t.status, {
         parent: t.epicId ? { id: '1', key: t.epicId, self: 'x', fields: { summary: s.epics[t.epicId]?.summary } } : undefined,
         assignee: t.assignee ? { accountId: t.assignee.accountId, displayName: t.assignee.displayName, active: true } : null,
-        labels: [...t.labels],
+        labels: [...t.labels, ...(t.deferred ? [LATER_LABEL] : [])],
         description: t.description ? markdownToAdf(t.description) : null,
         issuelinks: t.links.map((l) => ({ id: l.jiraLinkId, self: 'x', type: { id: '1', name: l.type, inward: 'is blocked by', outward: 'blocks' }, [l.direction === 'outward' ? 'outwardIssue' : 'inwardIssue']: { key: l.target } })),
       }));

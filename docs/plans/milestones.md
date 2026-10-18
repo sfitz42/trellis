@@ -156,7 +156,7 @@ Stop for review after each phase. Each one ends with `pnpm typecheck`, `pnpm lin
 - ✅ Done when it matches `docs/design/` and a two-browser test passes (one person drags an epic
   into the tray, the other sees it).
 
-**M4 · Jira**
+**M4 · Jira** ✅ done 18 Oct 2026 (sandbox NAI: NAI-9 and NAI-6 deferred, applied, re-pulled; changeset empty)
 - Defer and undefer comments, labels, label read on pull.
 - ✅ Done when the full loop on the sandbox project (defer, freeze, dry run, apply, re-pull) leaves
   an empty changeset with deferral preserved. Show the dry run before any `--yes`.

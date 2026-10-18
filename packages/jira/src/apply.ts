@@ -12,6 +12,7 @@ import { AcliAdapter } from './adapter.js';
 import type { CreateInput, JiraAdapter } from './adapter.js';
 import { loadJiraEnv, workspacePath } from './env.js';
 import { readJson, writeJsonAtomic } from './files.js';
+import { LATER_LABEL } from './normalize.js';
 import { buildPlan } from './plan.js';
 import type { ApplyPlan, DriftDecision, Note, PlanStep } from './plan.js';
 
@@ -43,6 +44,9 @@ export function noteText(n: Note, key: (id: IssueId) => IssueId): string {
     case 'dates': return `Planned dates: ${fmtDate(n.after.startDate)} → ${fmtDate(n.after.dueDate)} (was ${fmtDate(n.before.startDate)} → ${fmtDate(n.before.dueDate)}). Trellis owns roadmap dates; Jira's due date field is unchanged.`;
     case 'start': return `Planned start: ${fmtDate(n.startDate)}.`;
     case 'move': return `Moved to epic ${n.to ? key(n.to) : 'none'}${n.toName ? ` (${n.toName})` : ''} on the roadmap, from ${n.from ? key(n.from) : 'no epic'}. Please move it in Jira: the CLI can't change the parent.`;
+    case 'defer':
+      if (!n.deferred) return `Scheduled again on the roadmap (out of Deliver later; label ${LATER_LABEL} removed).`;
+      return `Moved to Deliver later on the roadmap: not planned for the current milestone (label ${LATER_LABEL}).${n.epic ? " Its planned dates are cleared in Trellis; Jira's due date field is unchanged." : ''}`;
   }
 }
 
@@ -138,7 +142,8 @@ export async function executePlan(plan: ApplyPlan, jira: JiraAdapter, previous: 
           const texts = notes.map((s) => noteText((s.action as Extract<PlanStep['action'], { do: 'note' }>).note, (id) => (isTempId(id) ? (keys.get(id) ?? id) : id)));
           await jira.addComment(key as string, commentBody(texts, a.reasons, opts.frozenBy, now().toISOString().slice(0, 10)));
           for (const n of notes) {
-            await record(n, { status: 'commented', key: key as string, acknowledge: (n.action as Extract<PlanStep['action'], { do: 'note' }>).acknowledge });
+            const ack = (n.action as Extract<PlanStep['action'], { do: 'note' }>).acknowledge;
+            await record(n, { status: 'commented', key: key as string, ...(ack !== undefined ? { acknowledge: ack } : {}) });
           }
           await record(step, { status: 'done', key: key as string });
           break;

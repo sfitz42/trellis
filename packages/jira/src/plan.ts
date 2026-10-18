@@ -6,12 +6,14 @@ import { COMMENT_ONLY, isTempId } from '@trellis/shared';
 import type { ChangeOp, Changeset, IssueId, Reason, Snapshot } from '@trellis/shared';
 import { markdownToAdf } from './adf.js';
 import type { CreateInput, JiraAdapter, RawIssue, UpdateInput } from './adapter.js';
-import { descriptionOf, labelsOf, linksOf, personOf, statusOf, typeName } from './normalize.js';
+import { deferredOf, descriptionOf, LATER_LABEL, labelsOf, linksOf, personOf, statusOf, typeName } from './normalize.js';
 
 export type Note =
   | { kind: 'dates'; before: { startDate: string | null; dueDate: string | null }; after: { startDate: string | null; dueDate: string | null } }
   | { kind: 'move'; from: IssueId | null; to: IssueId | null; toName: string | null }
-  | { kind: 'start'; startDate: string };
+  | { kind: 'start'; startDate: string }
+  /** Into or out of Deliver later; `epic` because a deferred epic's planned dates are cleared. */
+  | { kind: 'defer'; deferred: boolean; epic: boolean };
 
 export type StepAction =
   | { do: 'create'; input: CreateInput }
@@ -19,8 +21,8 @@ export type StepAction =
   | { do: 'transition'; status: string }
   | { do: 'link.add'; from: IssueId; to: IssueId; type: string }
   | { do: 'link.remove'; linkId: string }
-  /** Comment-only change; posted with the issue's comment step, then acknowledged. */
-  | { do: 'note'; note: Note; acknowledge: string }
+  /** A line in the issue's comment step. Comment-only changes are then acknowledged under that key. */
+  | { do: 'note'; note: Note; acknowledge?: string }
   | { do: 'comment'; reasons: Reason[] };
 
 export interface Drift {
@@ -109,7 +111,7 @@ function describe(op: ChangeOp): string {
     case 'ticket.move': return `epic ${show(op.before)} → ${show(op.after)} (as a comment: acli can't change the parent)`;
     case 'field.update': return `${op.field}: ${show(op.before)} → ${show(op.after)}`;
     case 'transition': return `status ${show(op.before)} → ${op.after}`;
-    case 'defer': return op.after ? 'move to Deliver later' : 'schedule again (out of Deliver later)';
+    case 'defer': return op.after ? `move to Deliver later (add label ${LATER_LABEL})` : `schedule again (remove label ${LATER_LABEL})`;
     case 'epic.dates': return `dates ${show(op.before.startDate)} … ${show(op.before.dueDate)} → ${show(op.after.startDate)} … ${show(op.after.dueDate)} (as a comment)`;
     case 'link.add': return `link: ${op.target} ${op.linkType.toLowerCase()} ${op.to}`;
     case 'link.remove': return `unlink: ${op.target} ${op.linkType.toLowerCase()} ${op.to}`;
@@ -194,10 +196,17 @@ export async function buildPlan(cs: Changeset, snapshot: Snapshot, jira: JiraAda
         step = { ...base, action: { do: 'transition', status: op.after }, run: true };
         if (raw && op.before !== null) checkDrift(step, 'status', liveValue(raw, 'status'), op.before, op.after);
         break;
-      case 'defer':
-        // TODO(M4): the deliver-later label and a note in the issue's comment.
-        step = { ...base, action: { do: 'comment', reasons: [] }, run: false, skipReason: 'deferral does not reach Jira yet' };
-        break;
+      case 'defer': {
+        // The label is the field; the note tells people why in the issue's one comment.
+        const fields: UpdateInput = op.after ? { labelsToAdd: [LATER_LABEL] } : { labelsToRemove: [LATER_LABEL] };
+        step = { ...base, action: { do: 'update', fields }, run: true };
+        if (raw) checkDrift(step, 'deferred', deferredOf(raw), op.before, op.after);
+        const isEpic = snapshot.epics[op.target] !== undefined || cs.ops.some((o) => o.kind === 'epic.create' && o.target === op.target);
+        steps.push(step);
+        steps.push({ ...base, id: `${op.index}:note`, summary: 'note in the issue comment', action: { do: 'note', note: { kind: 'defer', deferred: op.after, epic: isEpic } }, run: step.run, ...(step.skipReason ? { skipReason: step.skipReason } : {}) });
+        if (step.run) addReasons(op.target, op.reasons);
+        continue;
+      }
       case 'link.add': {
         step = { ...base, action: { do: 'link.add', from: op.target, to: op.to, type: op.linkType }, run: true };
         if (hasLink(raw, op.linkType, op.target, op.to).yes || hasLink(live.get(op.to), op.linkType, op.target, op.to).yes) {

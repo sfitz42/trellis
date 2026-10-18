@@ -61,9 +61,25 @@ export function linksOf(raw: RawIssue): Link[] {
   });
 }
 
-export function labelsOf(raw: RawIssue): string[] {
+/**
+ * The Jira label for Deliver later (docs/plans/milestones.md, M0 decision 4). Trellis reads it as
+ * `deferred` and never shows it among an issue's labels.
+ */
+export const LATER_LABEL = 'deliver-later';
+
+/** All of the issue's labels, the Deliver later one included. */
+export function allLabelsOf(raw: RawIssue): string[] {
   const l = raw.fields['labels'];
   return Array.isArray(l) ? l.filter((x): x is string => typeof x === 'string') : [];
+}
+
+/** The issue's labels as Trellis shows them: without the Deliver later label. */
+export function labelsOf(raw: RawIssue): string[] {
+  return allLabelsOf(raw).filter((l) => l !== LATER_LABEL);
+}
+
+export function deferredOf(raw: RawIssue): boolean {
+  return allLabelsOf(raw).includes(LATER_LABEL);
 }
 
 export function descriptionOf(raw: RawIssue): string {
@@ -83,7 +99,7 @@ export function toEpic(raw: RawIssue): Epic {
     startDate: null, // Trellis-owned
     dueDate: dueDateOf(raw),
     ticketOrder: [],
-    deferred: false,
+    deferred: deferredOf(raw),
   };
   const d = descriptionOf(raw);
   if (d) e.description = d;
@@ -102,7 +118,7 @@ export function toTicket(raw: RawIssue, epicKeys: ReadonlySet<string>): Ticket {
     labels: labelsOf(raw),
     storyPoints: null, // Trellis-owned
     links: linksOf(raw),
-    deferred: false,
+    deferred: deferredOf(raw),
   };
   const d = descriptionOf(raw);
   if (d) t.description = d;

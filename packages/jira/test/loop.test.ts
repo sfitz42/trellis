@@ -60,6 +60,16 @@ describe('pull', () => {
     expect(snap.workflow.assignableUsers.map((p) => p.displayName)).toEqual(fx.workflow.assignableUsers.map((p) => p.displayName));
   });
 
+  it('reads the deliver-later label as deferred and leaves it out of labels', async () => {
+    const jira = FakeJira.fromSnapshot(fixture());
+    jira.issues.get('PROJ-43')!.fields['labels'] = ['deliver-later'];
+    jira.issues.get('PROJ-128')!.fields['labels'] = ['frontend', 'deliver-later'];
+    const snap = await buildSnapshot(jira, opts);
+    expect(snap.epics['PROJ-43']).toMatchObject({ deferred: true, dueDate: '2027-05-31' }); // Jira's due date, as it is
+    expect(snap.tickets['PROJ-128']).toMatchObject({ deferred: true, labels: ['frontend'] });
+    expect(snap.tickets['PROJ-127']?.deferred).toBe(false);
+  });
+
   it('identifies epics by hierarchy level, skips sub-tasks, and detaches non-epic parents', async () => {
     const jira = FakeJira.fromSnapshot(fixture());
     jira.issues.set('PROJ-900', jira.raw('PROJ-900', 'Subtask', 'Sub-task', 'To Do', { parent: { key: 'PROJ-121' } }));
@@ -101,6 +111,29 @@ describe('plan (dry run)', () => {
     const over = await buildPlan(cs, s.snap, jira, { projectKey: 'PROJ', decisions: { [step?.id ?? '']: 'overwrite' } });
     expect(over.steps.find((x) => x.id === step?.id)).toMatchObject({ run: true, decision: 'overwrite' });
     expect((await buildPlan(cs, s.snap, jira, { projectKey: 'PROJ', onDrift: 'overwrite' })).steps.find((x) => x.id === step?.id)?.run).toBe(true);
+  });
+
+  it('defer: a label step plus a note for the issue comment; skipped when Jira already has it', async () => {
+    const jira = FakeJira.fromSnapshot(fixture());
+    const s = await session(jira);
+    s.apply({ author: { name: 'Sam', kind: 'human' }, ops: [{ type: 'epic.defer', id: 'PROJ-43', deferred: true }, { type: 'ticket.defer', id: 'PROJ-128', deferred: true }] });
+    const cs = computeChangeset(s.snap, s.state, s.log);
+    expect(cs.ops.map((o) => o.kind)).toEqual(['defer', 'defer']); // no separate dates change for PROJ-43
+    const plan = await buildPlan(cs, s.snap, jira, { projectKey: 'PROJ' });
+    expect(plan.steps.map((x) => [x.kind, x.target, x.action.do, x.run])).toEqual([
+      ['defer', 'PROJ-43', 'update', true], ['defer', 'PROJ-43', 'note', true],
+      ['defer', 'PROJ-128', 'update', true], ['defer', 'PROJ-128', 'note', true],
+      ['comment', 'PROJ-43', 'comment', true], ['comment', 'PROJ-128', 'comment', true],
+    ]);
+    expect(plan.steps[0]?.action).toEqual({ do: 'update', fields: { labelsToAdd: ['deliver-later'] } });
+    expect(formatPlan(plan)).toContain('move to Deliver later (add label deliver-later)');
+
+    // Someone already added the label to PROJ-128 in Jira: nothing to do there.
+    await jira.updateFields('PROJ-128', { labelsToAdd: ['deliver-later'] });
+    const again = await buildPlan(cs, s.snap, jira, { projectKey: 'PROJ' });
+    expect(again.steps.filter((x) => x.target === 'PROJ-128').map((x) => [x.action.do, x.run, x.skipReason])).toEqual([
+      ['update', false, 'already in Jira'], ['note', false, 'already in Jira'],
+    ]);
   });
 
   it('skips changes that are already in Jira', async () => {
@@ -154,6 +187,58 @@ describe('apply + re-pull', () => {
     expect(computeChangeset(next, state).ops).toEqual([]);
     expect(state.epics[epicKey]?.startDate).toBe('2027-04-01'); // Trellis-owned value kept
     expect(state.tickets['PROJ-126']?.epicId).toBe('PROJ-44'); // roadmap keeps the move
+  });
+
+  it('runs the loop for deferral: labels and notes land, and deferral survives the re-pull', async () => {
+    const jira = FakeJira.fromSnapshot(fixture());
+    jira.issues.get('PROJ-44')!.fields['labels'] = ['deliver-later']; // deferred in Jira before the session
+    const s = await session(jira);
+    expect(s.state.epics['PROJ-44']).toMatchObject({ deferred: true, dueDate: null });
+    s.apply({
+      author: { name: 'Claude Code', kind: 'agent' }, reason: "Notifications won't make 9 Nov, put it in deliver later", askedBy: 'Shaun',
+      ops: [
+        { type: 'epic.defer', id: 'PROJ-43', deferred: true },
+        { type: 'ticket.defer', id: 'PROJ-128', deferred: true },
+        { type: 'ticket.create', tempId: 'NEW-1', epicId: 'PROJ-41', fields: { summary: 'Later polish' } },
+        { type: 'ticket.defer', id: 'NEW-1', deferred: true },
+      ],
+    });
+    s.apply({ author: { name: 'Shaun', kind: 'human' }, ops: [
+      { type: 'epic.defer', id: 'PROJ-44', deferred: false },
+      { type: 'epic.setDates', id: 'PROJ-44', startDate: '2026-10-19', dueDate: '2026-11-08' },
+    ] });
+    const plan = await buildPlan(computeChangeset(s.snap, s.state, s.log), s.snap, jira, { projectKey: 'PROJ' });
+    let saved: LogEntry[] = [];
+    const result = await executePlan(plan, jira, [], { save: (l) => { saved = [...l]; return Promise.resolve(); }, now: () => new Date('2026-10-17T11:00:00Z') });
+    expect(result.failed).toBeNull();
+
+    const newKey = saved.find((e) => e.target === 'NEW-1' && e.createdKey)?.createdKey ?? '';
+    expect(jira.issues.get('PROJ-43')?.fields['labels']).toEqual(['deliver-later']);
+    expect(jira.issues.get('PROJ-43')?.fields['duedate']).toBe('2027-05-31'); // acli can't clear it
+    expect(jira.issues.get('PROJ-128')?.fields['labels']).toEqual(['frontend', 'deliver-later']);
+    expect(jira.issues.get(newKey)?.fields['labels']).toEqual(['deliver-later']);
+    expect(jira.issues.get('PROJ-44')?.fields['labels']).toEqual([]);
+
+    // One comment per issue: the note, then the captured request.
+    const comment = (key: string): string => adfToMarkdown(jira.comments.filter((c) => c.key === key).map((c) => c.body)[0]);
+    expect(jira.comments.filter((c) => c.key === 'PROJ-43')).toHaveLength(1);
+    expect(comment('PROJ-43')).toContain("Moved to Deliver later on the roadmap: not planned for the current milestone (label deliver-later). Its planned dates are cleared in Trellis; Jira's due date field is unchanged.");
+    expect(comment('PROJ-43')).toContain(`"Notifications won't make 9 Nov, put it in deliver later" (asked by Shaun)`);
+    expect(comment('PROJ-128')).toContain('Moved to Deliver later on the roadmap: not planned for the current milestone (label deliver-later).');
+    expect(comment('PROJ-128')).not.toContain('planned dates');
+    expect(comment('PROJ-44')).toContain('Scheduled again on the roadmap (out of Deliver later; label deliver-later removed).');
+    expect(comment('PROJ-44')).toContain('Planned dates: 19 Oct 2026 → 8 Nov 2026');
+
+    // Re-pull: empty changeset, deferral preserved.
+    const next = await buildSnapshot(jira, opts);
+    const tempIds = Object.fromEntries(saved.filter((e) => e.createdKey).map((e) => [e.target, e.createdKey ?? '']));
+    const told = saved.filter((e) => e.status === 'commented' && e.acknowledge).map((e) => e.acknowledge ?? '');
+    const { state } = rebaseOnSnapshot(s.state, s.snap, next, tempIds, told);
+    expect(computeChangeset(next, state).ops).toEqual([]);
+    expect(state.epics['PROJ-43']).toMatchObject({ deferred: true, dueDate: null });
+    expect(state.tickets['PROJ-128']).toMatchObject({ deferred: true, labels: ['frontend'] });
+    expect(state.tickets[newKey]?.deferred).toBe(true);
+    expect(state.epics['PROJ-44']).toMatchObject({ deferred: false, dueDate: '2026-11-08' });
   });
 
   it('stops on failure and resumes without repeating completed steps', async () => {
