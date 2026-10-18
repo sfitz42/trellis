@@ -14,6 +14,7 @@ import EpicFocus from '../src/components/EpicFocus.svelte';
 import FreezeScreen from '../src/components/FreezeScreen.svelte';
 import TicketPanel from '../src/components/TicketPanel.svelte';
 import Timeline from '../src/components/Timeline.svelte';
+import Toolbar from '../src/components/Toolbar.svelte';
 import TopBar from '../src/components/TopBar.svelte';
 import { Live } from '../src/lib/live.svelte.js';
 import { ui } from '../src/lib/ui.svelte.js';
@@ -98,6 +99,64 @@ describe('screen 1 · live roadmap session', () => {
     expect(html).toContain('title="Differs from Jira"');
     expect(html).toContain('→ blocks PROJ-122');
     expect(html).toContain('+ Add ticket');
+  });
+
+  /** Design screen 1: Delivery on 9 Nov; Notifications and Admin console deferred, and one ticket. */
+  function deliveryPlan(apply: (b: Batch) => OplogEntry, live: Live, showLater = true): void {
+    apply({
+      author: { name: 'James', kind: 'human' },
+      ops: [
+        { type: 'timeline.set', timeline: { ...live.roadmap.timeline, scale: 'milestones', start: '2026-10-19', showLater, milestones: [{ id: 'm1', label: 'Delivery', date: '2026-11-09' }] } },
+        { type: 'epic.setDates', id: 'PROJ-40', startDate: '2026-10-19', dueDate: '2026-11-01' },
+        { type: 'epic.setDates', id: 'PROJ-41', startDate: '2026-10-26', dueDate: '2026-11-08' },
+        { type: 'epic.setDates', id: 'PROJ-42', startDate: '2026-10-19', dueDate: '2026-11-08' },
+        { type: 'epic.defer', id: 'PROJ-43', deferred: true },
+        { type: 'epic.defer', id: 'PROJ-44', deferred: true },
+        { type: 'ticket.defer', id: 'PROJ-128', deferred: true },
+      ],
+    });
+  }
+
+  it('milestones scale: week columns, the milestone line and tag, and the Deliver later tray', () => {
+    const { live, apply } = session();
+    deliveryPlan(apply, live);
+    ui.expanded = ['PROJ-41'];
+    const html = text(render(Timeline, { props: { live } }));
+    expect(html).toContain('w/c 19 Oct');
+    expect(html).toContain('w/c 2 Nov');
+    expect(html).not.toContain('w/c 9 Nov'); // the grid ends at the milestone
+    expect(html).toMatch(/class="ms-tag[^"]*"[^>]*>.*9 Nov/);
+    expect(html).toContain('class="ms-line');
+    expect(html).toContain('Deliver later');
+    expect(html).toContain('no date · after Delivery');
+    expect(html).toMatch(/data-tray="PROJ-43"[\s\S]*Notifications service[\s\S]*6 tickets/);
+    expect(html).toContain('aria-label="Admin console, in Deliver later, 4 tickets.');
+    expect(html).toContain('8 + 1 later');
+    expect(html).toContain('Deferred by James'); // PROJ-128's card, in the tray on its epic's row
+    expect(html).toContain('Schedule');
+  });
+
+  it('shows the scope summary and milestone chips in the toolbar', () => {
+    const { live, apply } = session();
+    deliveryPlan(apply, live);
+    const html = text(render(Toolbar, { props: { live } }));
+    expect(html).toMatch(/<option value="milestones"[^>]*>Milestones<\/option>\s*<option value="weeks"/);
+    expect(html).toContain('Delivery · 9 Nov');
+    expect(html).toContain('+ Milestone');
+    expect(html).toContain('Show Deliver later');
+    expect(html).toMatch(/By 9 Nov<\/strong> 3 epics · 23 tickets/);
+    expect(html).toMatch(/Later<\/strong> 2 epics · 11 tickets/);
+  });
+
+  it('hides the tray and deferred work when Show Deliver later is off', () => {
+    const { live, apply } = session();
+    deliveryPlan(apply, live, false);
+    ui.expanded = ['PROJ-41'];
+    const html = text(render(Timeline, { props: { live } }));
+    expect(html).not.toContain('data-tray');
+    expect(html).not.toContain('Notifications service');
+    expect(html).not.toContain('PROJ-128');
+    expect(html).toContain('8 + 1 later'); // the count still says some of it is later
   });
 
   it('filters tickets', () => {
@@ -222,6 +281,16 @@ describe('screen 4 · freeze and apply', () => {
     expect(html).toContain('Create');
     expect(html).toContain('Dry-run migration against staging copy');
     expect(html).toContain('Claude Code');
+  });
+
+  it('shows deferral as a Defer operation', () => {
+    const { live, apply } = session();
+    apply({ author: { name: 'James', kind: 'human' }, ops: [{ type: 'epic.defer', id: 'PROJ-44', deferred: true }] });
+    const ops = computeChangeset(snapshot, live.roadmap, live.oplog).ops;
+    const html = text(render(ChangesTable, { props: { ops } }));
+    expect(html).toContain('<span class="tag op later');
+    expect(html).toContain('>Defer</span>');
+    expect(html).toContain('Moved to Deliver later');
   });
 });
 

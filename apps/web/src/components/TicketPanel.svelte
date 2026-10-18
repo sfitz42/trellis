@@ -1,9 +1,11 @@
 <script lang="ts">
   import type { IssueId, Person } from '@trellis/shared';
-  import { changesByItem, dependenciesOf, describeChange, isNew, revertOps } from '../lib/items.js';
+  import { changesByItem, dependenciesOf, describeChange, isNew, revertOps, warningsByItem } from '../lib/items.js';
   import type { Live } from '../lib/live.svelte.js';
   import { ui } from '../lib/ui.svelte.js';
+  import { todayIso } from '../lib/view.js';
   import Avatar from './Avatar.svelte';
+  import TrayIcon from './TrayIcon.svelte';
 
   let { live }: { live: Live } = $props();
 
@@ -11,8 +13,10 @@
   const t = $derived(ui.ticket ? rm.tickets[ui.ticket] : undefined);
   const snap = $derived(t ? live.snapshot?.tickets[t.id] : undefined);
   const changes = $derived(t ? (changesByItem(live.changeset).get(t.id) ?? []) : []);
-  const changedFields = $derived(new Set(changes.flatMap((c) => (c.target !== t?.id ? [] : c.kind === 'field.update' ? [c.field] : c.kind === 'transition' ? ['status'] : c.kind === 'ticket.move' ? ['epic'] : c.kind.startsWith('link') ? ['links'] : []))));
+  const changedFields = $derived(new Set(changes.flatMap((c) => (c.target !== t?.id ? [] : c.kind === 'field.update' ? [c.field] : c.kind === 'transition' ? ['status'] : c.kind === 'ticket.move' ? ['epic'] : c.kind === 'defer' ? ['later'] : c.kind.startsWith('link') ? ['links'] : []))));
   const viewers = $derived(t ? live.viewersOf(t.id) : []);
+  const epicLater = $derived(t?.epicId ? rm.epics[t.epicId]?.deferred === true : false);
+  const warnings = $derived(t ? (warningsByItem(rm, todayIso()).get(t.id) ?? []) : []);
   const deps = $derived(t ? dependenciesOf(rm, t.id) : { blockedBy: [], blocks: [], other: [] });
   const wf = $derived(live.snapshot?.workflow);
   const statuses = $derived.by(() => {
@@ -88,6 +92,9 @@
   {:else}
     <header>
       <span class="key">{t.id}</span>
+      {#if t.deferred || epicLater}
+        <span class="tag later"><TrayIcon size={13} />{rm.timeline.laterLabel}{epicLater && !t.deferred ? ' (with its epic)' : ''}{changedFields.has('later') ? ' · changed' : ''}</span>
+      {/if}
       {#each viewers as v (v.clientId)}
         <span class="viewing"><Avatar name={v.name} kind={v.kind} size={20} /> {v.name} is also viewing</span>
       {/each}
@@ -95,6 +102,16 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
       </button>
     </header>
+
+    {#each warnings as w, i (i)}
+      <p class="warn" role="note"><span aria-hidden="true">⚠</span> {w.message}</p>
+    {/each}
+
+    {#if !epicLater}
+      <button class="btn small later-btn" onclick={() => { live.submit([{ type: 'ticket.defer', id: t.id, deferred: !t.deferred }]); }}>
+        <TrayIcon size={14} />{t.deferred ? 'Schedule again' : `Move to ${rm.timeline.laterLabel}`}
+      </button>
+    {/if}
 
     <label class="field" class:changed={changedFields.has('summary')}>
       <span>Summary{changedFields.has('summary') ? ' · changed' : ''}</span>
@@ -242,4 +259,6 @@
   .differs p { margin: 0; color: var(--ink-muted); font-size: 13px; }
   .differs .btn { justify-self: start; }
   .missing { display: grid; gap: 12px; }
+  .later-btn { justify-self: start; display: inline-flex; align-items: center; gap: 6px; }
+  .warn { margin: 0; padding: 8px 12px; background: var(--warn-tint); border: 1px solid var(--warn); border-radius: var(--radius); color: var(--warn-text); font-size: 13px; }
 </style>

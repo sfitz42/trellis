@@ -1,8 +1,9 @@
 // Per-item views over the model: what differs from Jira, how to revert it, dependencies, and
 // plain-language descriptions of ops for the activity feed and agent panel.
-import { acknowledgedDates, BLOCKS, computeChangeset, isTempId } from '@trellis/shared';
-import type { ChangeOp, Changeset, Epic, IssueId, Op, OplogEntry, RoadmapState, Snapshot, Ticket } from '@trellis/shared';
-import { fmtMonth } from './timeline.js';
+import { acknowledgedDates, BLOCKS, computeChangeset, isTempId, scopeWarnings } from '@trellis/shared';
+import type { ChangeOp, Changeset, Epic, IssueId, Op, OplogEntry, RoadmapState, ScopeWarning, Snapshot, Ticket } from '@trellis/shared';
+import { fmtMonth, scheduleAt } from './timeline.js';
+import type { Scale, Span } from './timeline.js';
 
 // --- differs from Jira
 
@@ -58,9 +59,11 @@ export function revertOps(id: IssueId, snapshot: Snapshot, state: RoadmapState):
     if ((eNow.description ?? '') !== (eSnap.description ?? '')) fields.description = eSnap.description ?? '';
     if (Object.keys(fields).length) ops.push({ type: 'epic.update', id, fields });
     if (eNow.status !== eSnap.status) ops.push({ type: 'epic.transition', id, status: eSnap.status });
+    // Undefer before setting dates (a deferred epic takes none); deferring clears them.
+    if (eNow.deferred !== eSnap.deferred) ops.push({ type: 'epic.defer', id, deferred: eSnap.deferred });
     // Dates are Trellis-owned: "Jira's values" are the dates Jira was last told.
     const told = acknowledgedDates(state, id) ?? { startDate: eSnap.startDate, dueDate: eSnap.dueDate };
-    if (eNow.startDate !== told.startDate || eNow.dueDate !== told.dueDate) ops.push({ type: 'epic.setDates', id, startDate: told.startDate, dueDate: told.dueDate });
+    if (!eSnap.deferred && (eNow.startDate !== told.startDate || eNow.dueDate !== told.dueDate)) ops.push({ type: 'epic.setDates', id, startDate: told.startDate, dueDate: told.dueDate });
     return ops;
   }
   const tSnap = snapshot.tickets[id];
@@ -75,6 +78,7 @@ export function revertOps(id: IssueId, snapshot: Snapshot, state: RoadmapState):
   if (Object.keys(fields).length) ops.push({ type: 'ticket.update', id, fields });
   if (tNow.epicId !== tSnap.epicId && (tSnap.epicId === null || state.epics[tSnap.epicId])) ops.push({ type: 'ticket.move', id, epicId: tSnap.epicId });
   if (tNow.status !== tSnap.status) ops.push({ type: 'ticket.transition', id, status: tSnap.status });
+  if (tNow.deferred !== tSnap.deferred) ops.push({ type: 'ticket.defer', id, deferred: tSnap.deferred });
   // Blocks links touching this ticket: restore Jira's set.
   const was = blocksPairs(Object.values(snapshot.tickets)).filter(([a, b]) => a === id || b === id);
   const now = blocksPairs(Object.values(state.tickets)).filter(([a, b]) => a === id || b === id);
@@ -146,6 +150,49 @@ export function backwardsWarnings(state: RoadmapState, id?: IssueId): BackwardsW
       });
     }
   }
+  return out;
+}
+
+// --- Deliver later and milestones
+
+/** The dates an epic had when it was last deferred (kept in that op's undo), if it's in the log. */
+export function datesBeforeDefer(oplog: readonly OplogEntry[], id: IssueId): Span | undefined {
+  for (const entry of [...oplog].reverse()) {
+    for (const a of [...entry.result.applied].reverse()) {
+      if (a.op.type !== 'epic.defer' || a.op.id !== id || !a.op.deferred) continue;
+      const inv = a.inverse.find((o) => o.type === 'epic.setDates');
+      return inv?.type === 'epic.setDates' ? { startDate: inv.startDate, dueDate: inv.dueDate } : undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Ops that take an epic out of Deliver later. Dropped `at` a date: it starts there, keeping the
+ * length it had before (else of the dates Jira knows, else one unit). Without `at` (the Schedule
+ * action): its dates from before it was deferred come back, or it starts `today`.
+ */
+export function scheduleEpicOps(state: RoadmapState, id: IssueId, scale: Scale, opts: { at?: string; today: string; oplog?: readonly OplogEntry[] }): Op[] {
+  const before = datesBeforeDefer(opts.oplog ?? [], id);
+  const dates = opts.at === undefined && before?.dueDate
+    ? { startDate: before.startDate, dueDate: before.dueDate }
+    : scheduleAt(opts.at ?? opts.today, before ?? acknowledgedDates(state, id), scale);
+  return [{ type: 'epic.defer', id, deferred: false }, { type: 'epic.setDates', id, ...dates }];
+}
+
+/** A few words for a tag; the full message goes in its title. */
+export function warningShort(w: ScopeWarning): string {
+  switch (w.kind) {
+    case 'pastMilestone': return `after ${w.milestone.label}`;
+    case 'blockedByLater': return `blocked by later ${w.blocker}`;
+    case 'noSlack': return `no slack before ${w.milestone.label}`;
+  }
+}
+
+/** Milestone and deferral warnings, by the item they show on. */
+export function warningsByItem(state: RoadmapState, today: string): Map<IssueId, ScopeWarning[]> {
+  const out = new Map<IssueId, ScopeWarning[]>();
+  for (const w of scopeWarnings(state, today)) out.set(w.id, [...(out.get(w.id) ?? []), w]);
   return out;
 }
 

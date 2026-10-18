@@ -84,7 +84,9 @@ export function columns(t: TimelineConfig): Column[] {
     const d = parse(start);
     const year = String(d.getUTCFullYear());
     const end = unitEnd(start, unit);
-    if (unit === 'months') out.push({ start, end, label: MONTHS[d.getUTCMonth()] ?? '', sublabel: year });
+    // Milestones scale, as in the design: "w/c 19 Oct" over "week 2" (Timeline says "this week").
+    if (t.scale === 'milestones') out.push({ start, end, label: `w/c ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()] ?? ''}`, sublabel: `week ${out.length + 1}` });
+    else if (unit === 'months') out.push({ start, end, label: MONTHS[d.getUTCMonth()] ?? '', sublabel: year });
     else if (unit === 'quarters') out.push({ start, end, label: `Q${Math.floor(d.getUTCMonth() / 3) + 1}`, sublabel: year });
     else out.push({ start, end, label: `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()] ?? ''}`, sublabel: `w/c · ${year}` });
   }
@@ -167,6 +169,23 @@ export function dragDates(span: Span, mode: DragMode, units: number, scale: Scal
   }
   const due = unitEnd(shift(baseDue, units, unit), unit);
   return { startDate: baseStart, dueDate: due < baseStart ? unitEnd(baseStart, unit) : due };
+}
+
+/**
+ * Dates for an epic dragged out of Deliver later and dropped on `date`: it starts at that unit and
+ * keeps the length it had before (`previous`, e.g. the dates Jira knows), else spans one unit.
+ */
+export function scheduleAt(date: string, previous: Span | undefined, scale: Scale): { startDate: string; dueDate: string } {
+  const unit = unitOf(scale);
+  const startDate = unitStart(date, unit);
+  const days = previous?.startDate && previous.dueDate ? daysBetween(previous.startDate, previous.dueDate) : 0;
+  return { startDate, dueDate: unitEnd(addDays(startDate, days), unit) };
+}
+
+/** "9 Nov" for milestone tags and scope chips. */
+export function fmtDay(date: string): string {
+  const d = parse(date);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()] ?? ''}`;
 }
 
 /** Timeline that starts at `start`'s unit and shows `count` units. */

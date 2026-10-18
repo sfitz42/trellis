@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TimelineConfig } from '@trellis/shared';
 import {
-  barGeometry, columnIndex, columns, dragDates, endPosition, position, shift, timelineFrom, unitEnd, unitStart,
+  barGeometry, columnIndex, columns, dragDates, endPosition, fmtDay, position, scheduleAt, shift, timelineFrom, unitEnd, unitStart,
 } from '../src/lib/timeline.js';
 
 const DEFAULTS = { milestones: [], showLater: true, laterLabel: 'Deliver later' };
@@ -44,7 +44,10 @@ describe('columns', () => {
     // Design screen 1: w/c 19 Oct, 26 Oct, 2 Nov; the 9 Nov line closes the grid.
     const t = tl({ scale: 'milestones', start: '2026-10-19', end: '2026-12-13', milestones: [{ id: 'm1', label: 'Delivery', date: '2026-11-09' }] });
     expect(columns(t).map((c) => c.start)).toEqual(['2026-10-19', '2026-10-26', '2026-11-02']);
+    expect(columns(t).map((c) => `${c.label} / ${c.sublabel}`)).toEqual(['w/c 19 Oct / week 1', 'w/c 26 Oct / week 2', 'w/c 2 Nov / week 3']);
     expect(columns({ ...t, milestones: [] })).toHaveLength(8);
+    // The 9 Nov line closes the grid: the start of the milestone day.
+    expect(position('2026-11-09', columns(t))).toBe(3);
   });
 });
 
@@ -85,6 +88,15 @@ describe('dragDates', () => {
 
   it('gives a start date to an epic that only had a due date', () => {
     expect(dragDates({ startDate: null, dueDate: '2027-02-28' }, 'start', -2, 'months')).toEqual({ startDate: '2026-12-01', dueDate: '2027-02-28' });
+  });
+});
+
+describe('scheduleAt', () => {
+  it('starts at the drop unit and keeps the previous length, else one unit', () => {
+    expect(scheduleAt('2026-11-04', { startDate: '2026-10-05', dueDate: '2026-10-25' }, 'milestones')).toEqual({ startDate: '2026-11-02', dueDate: '2026-11-22' });
+    expect(scheduleAt('2026-11-04', undefined, 'weeks')).toEqual({ startDate: '2026-11-02', dueDate: '2026-11-08' });
+    expect(scheduleAt('2026-11-04', { startDate: null, dueDate: '2027-01-31' }, 'months')).toEqual({ startDate: '2026-11-01', dueDate: '2026-11-30' });
+    expect(fmtDay('2026-11-09')).toBe('9 Nov');
   });
 });
 

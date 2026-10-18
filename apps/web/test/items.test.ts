@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { applyBatch, computeChangeset, fromSnapshot, Snapshot } from '@trellis/shared';
-import type { Op, RoadmapState } from '@trellis/shared';
+import type { Op, OplogEntry, RoadmapState } from '@trellis/shared';
 import {
-  backwardsWarnings, changesByItem, dependenciesOf, describeChange, describeOp, idsOfOp, initials, revertOps,
+  backwardsWarnings, changesByItem, dependenciesOf, describeChange, describeOp, idsOfOp, initials, revertOps, scheduleEpicOps,
 } from '../src/lib/items.js';
 
 const snapshot = Snapshot.parse(JSON.parse(readFileSync(new URL('../../../packages/shared/fixtures/snapshot.sample.json', import.meta.url), 'utf8')));
@@ -43,6 +43,43 @@ describe('differs from Jira', () => {
     const reverted = apply(edited, revertOps('PROJ-41', snapshot, edited));
     expect(computeChangeset(snapshot, reverted).ops).toEqual([]);
     expect(reverted.epics['PROJ-41']).toMatchObject({ startDate: null, dueDate: '2027-02-28' });
+  });
+});
+
+describe('deliver later', () => {
+  it('reverting a deferred epic undefers it and restores the dates Jira knows', () => {
+    const s = apply(fresh(), [{ type: 'epic.defer', id: 'PROJ-43', deferred: true }]);
+    const ops = revertOps('PROJ-43', snapshot, s);
+    expect(ops).toEqual([
+      { type: 'epic.defer', id: 'PROJ-43', deferred: false },
+      { type: 'epic.setDates', id: 'PROJ-43', startDate: null, dueDate: '2027-05-31' },
+    ]);
+    expect(computeChangeset(snapshot, apply(s, ops)).ops).toEqual([]);
+  });
+
+  it('reverting a deferred ticket schedules it again', () => {
+    const s = apply(fresh(), [{ type: 'ticket.defer', id: 'PROJ-128', deferred: true }]);
+    expect(revertOps('PROJ-128', snapshot, s)).toEqual([{ type: 'ticket.defer', id: 'PROJ-128', deferred: false }]);
+  });
+
+  it('schedules a deferred epic: its earlier dates back, or from where it is dropped', () => {
+    const dated = apply(fresh(), [{ type: 'epic.setDates', id: 'PROJ-41', startDate: '2026-10-19', dueDate: '2026-11-08' }]);
+    const out = applyBatch(dated, { author: { name: 'Sam', kind: 'human' }, ops: [{ type: 'epic.defer', id: 'PROJ-41', deferred: true }] }, { batchId: 'b9', workflow: snapshot.workflow });
+    const oplog: OplogEntry[] = [{ batch: { id: 'b9', author: { name: 'Sam', kind: 'human' }, ops: [] }, result: out.result, at: '' }];
+    const undefer = { type: 'epic.defer', id: 'PROJ-41', deferred: false };
+    // Schedule (no drop point): the dates it had before it was deferred.
+    expect(scheduleEpicOps(out.state, 'PROJ-41', 'milestones', { today: '2026-10-18', oplog })).toEqual([
+      undefer, { type: 'epic.setDates', id: 'PROJ-41', startDate: '2026-10-19', dueDate: '2026-11-08' },
+    ]);
+    // Dropped on w/c 2 Nov: same three-week length from there.
+    expect(scheduleEpicOps(out.state, 'PROJ-41', 'milestones', { at: '2026-11-04', today: '2026-10-18', oplog })).toEqual([
+      undefer, { type: 'epic.setDates', id: 'PROJ-41', startDate: '2026-11-02', dueDate: '2026-11-22' },
+    ]);
+    // Nothing in the log: Jira only knows a due date, so one unit from today.
+    expect(scheduleEpicOps(out.state, 'PROJ-41', 'milestones', { today: '2026-10-18' })).toEqual([
+      undefer, { type: 'epic.setDates', id: 'PROJ-41', startDate: '2026-10-12', dueDate: '2026-10-18' },
+    ]);
+    expect(describeOp({ type: 'epic.defer', id: 'PROJ-41', deferred: true }, out.state)).toBe('moved Data migration to Deliver later');
   });
 });
 

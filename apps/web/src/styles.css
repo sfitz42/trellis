@@ -31,6 +31,15 @@
   --error-tint: #f3d8d2;
   --error-text: #7e3226;
 
+  /* Milestones and Deliver later (docs/plans/milestones.md) */
+  --milestone: #c9963a;
+  --this-week: #faf1e7;
+  --later-tint: #efe3d6;
+  --later-ink: #464a3b;
+  --later-hatch: repeating-linear-gradient(135deg, #f6eadf 0 10px, #fbf3ea 10px 20px);
+  --tray-w: 300px;
+  --tray-gutter: 20px;
+
   --epic-1: #ddbea9;
   --epic-1-ink: #5b3f2c;
   --epic-2: #d3e2e1;
@@ -126,6 +135,7 @@ textarea.input { min-height: 96px; resize: vertical; }
 .tag.changed { background: var(--changed-tint); color: var(--changed-text); }
 .tag.warn { background: var(--warn-tint); color: var(--warn-text); }
 .tag.error { background: var(--error-tint); color: var(--error-text); }
+.tag.later { background: var(--later-tint); color: var(--later-ink); }
 
 .panel {
   background: var(--surface);

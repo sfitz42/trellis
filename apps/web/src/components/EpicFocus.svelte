@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { backwardsWarnings, changesByItem, dependenciesOf, epicOf, isNew } from '../lib/items.js';
+  import type { Op } from '@trellis/shared';
+  import { backwardsWarnings, changesByItem, dependenciesOf, epicOf, isNew, scheduleEpicOps, warningsByItem } from '../lib/items.js';
   import type { Live } from '../lib/live.svelte.js';
   import { fmtMonth, fmtRange } from '../lib/timeline.js';
   import { ui } from '../lib/ui.svelte.js';
-  import { statusCategory } from '../lib/view.js';
+  import { statusCategory, todayIso } from '../lib/view.js';
   import TicketCard from './TicketCard.svelte';
+  import TrayIcon from './TrayIcon.svelte';
 
   let { live }: { live: Live } = $props();
 
@@ -15,6 +17,9 @@
   const selected = $derived(ui.ticket);
   const deps = $derived(selected ? dependenciesOf(rm, selected) : null);
   const warnings = $derived(selected ? backwardsWarnings(rm, selected) : []);
+  const scoped = $derived(warningsByItem(rm, todayIso()));
+  /** Milestone and deferral warnings for the epic and the selected ticket. */
+  const scopeNotes = $derived([...(epic ? (scoped.get(epic.id) ?? []) : []), ...(selected ? (scoped.get(selected) ?? []) : [])]);
   const tickets = $derived(epic ? epic.ticketOrder.flatMap((id) => (rm.tickets[id] ? [rm.tickets[id]] : [])) : Object.values(rm.tickets).filter((t) => t.epicId === null));
 
   function epicName(id: string): string {
@@ -28,7 +33,18 @@
       live.notify('error', 'Start date must be on or before the due date');
       return;
     }
-    live.submit([{ type: 'epic.setDates', id: epic.id, startDate: next.startDate, dueDate: next.dueDate }]);
+    // A date on a deferred epic schedules it again: undefer first, in the same batch.
+    const ops: Op[] = epic.deferred ? [{ type: 'epic.defer', id: epic.id, deferred: false }] : [];
+    ops.push({ type: 'epic.setDates', id: epic.id, startDate: next.startDate, dueDate: next.dueDate });
+    live.submit(ops, { atomic: true });
+  }
+
+  function toggleLater(): void {
+    if (!epic) return;
+    const ops = epic.deferred
+      ? scheduleEpicOps(rm, epic.id, rm.timeline.scale, { today: todayIso(), oplog: live.oplog })
+      : [{ type: 'epic.defer' as const, id: epic.id, deferred: true }];
+    live.submit(ops, { atomic: true });
   }
 </script>
 
@@ -41,8 +57,13 @@
 <header class="title">
   <h1>{epic?.summary ?? 'Tickets without an epic'}</h1>
   {#if epic}
-    <span class="chip people">{fmtRange(epic)}</span>
-    {#if jiraEpic && jiraEpic.dueDate !== epic.dueDate}
+    {#if epic.deferred}
+      <span class="chip later"><TrayIcon size={14} /> {rm.timeline.laterLabel}</span>
+    {:else}
+      <span class="chip people">{fmtRange(epic)}</span>
+    {/if}
+    <button class="btn small later-btn" onclick={toggleLater}><TrayIcon size={14} />{epic.deferred ? 'Schedule again' : `Move to ${rm.timeline.laterLabel}`}</button>
+    {#if jiraEpic && !epic.deferred && jiraEpic.dueDate !== epic.dueDate}
       <span class="chip changed">Jira: due {fmtMonth(jiraEpic.dueDate)}</span>
     {/if}
     <div class="dates">
@@ -88,6 +109,10 @@
   </section>
 {/if}
 
+{#each scopeNotes as w, i (i)}
+  <p class="warn scope-note" role="note"><span aria-hidden="true">⚠</span> {w.message}</p>
+{/each}
+
 <section class="panel box" aria-label="Tickets in this epic">
   <h2>Tickets in this epic</h2>
   <div class="grid">
@@ -116,6 +141,9 @@
   .chip { padding: 3px 10px; border-radius: 999px; font-size: 13px; }
   .chip.people { background: var(--people-tint); color: var(--people-text); }
   .chip.changed { background: var(--changed-tint); color: var(--changed-text); }
+  .chip.later { display: inline-flex; align-items: center; gap: 6px; background: var(--later-tint); color: var(--later-ink); }
+  .later-btn { display: inline-flex; align-items: center; gap: 6px; }
+  .scope-note { margin-bottom: 16px; }
   .dates { display: flex; gap: 10px; margin-left: auto; }
   .dates label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-muted); }
   .dates .input { width: 160px; color: var(--ink); }

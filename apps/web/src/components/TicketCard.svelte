@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { Claim, Ticket } from '@trellis/shared';
+  import TrayIcon from './TrayIcon.svelte';
 
   let {
     ticket, category, changed, movedFrom, isNew, agent, lock, selected = false, blocks, dragging = false, offset, compact = false,
-    onopen, onpointerdown, onkeydown,
+    later = false, deferredBy, warning, onopen, onpointerdown, onkeydown,
   }: {
     ticket: Ticket;
     category: string;
@@ -17,13 +18,19 @@
     dragging?: boolean;
     offset?: { x: number; y: number } | undefined;
     compact?: boolean;
+    /** In Deliver later (itself or through its epic). */
+    later?: boolean;
+    /** Who deferred it, when known. */
+    deferredBy?: string | undefined;
+    /** A milestone or deferral warning to flag on the card. */
+    warning?: { short: string; message: string } | undefined;
     onopen: () => void;
     onpointerdown?: ((e: PointerEvent) => void) | undefined;
     onkeydown?: ((e: KeyboardEvent) => void) | undefined;
   } = $props();
 
   const label = $derived(
-    `${ticket.id} ${ticket.summary}, ${ticket.status}${ticket.storyPoints !== null ? `, ${ticket.storyPoints} points` : ''}${changed ? ', changed from Jira' : ''}${isNew ? ', new' : ''}${agent ? ', added or changed by agent' : ''}${lock ? `, ${lock.holder} is ${lock.kind === 'drag' ? 'moving' : 'editing'} it` : ''}`,
+    `${ticket.id} ${ticket.summary}, ${ticket.status}${ticket.storyPoints !== null ? `, ${ticket.storyPoints} points` : ''}${changed ? ', changed from Jira' : ''}${isNew ? ', new' : ''}${agent ? ', added or changed by agent' : ''}${later ? ', in Deliver later' : ''}${warning ? `, warning: ${warning.message}` : ''}${lock ? `, ${lock.holder} is ${lock.kind === 'drag' ? 'moving' : 'editing'} it` : ''}`,
   );
 </script>
 
@@ -37,10 +44,11 @@
   class:selected
   class:dragging
   class:compact
+  class:later
   data-card={ticket.id}
   style:transform={offset ? `translate(${offset.x}px, ${offset.y}px)` : undefined}
   aria-label={label}
-  aria-keyshortcuts="Enter Alt+ArrowUp Alt+ArrowDown"
+  aria-keyshortcuts="Enter Alt+ArrowUp Alt+ArrowDown L"
   onclick={onopen}
   {onpointerdown}
   {onkeydown}
@@ -61,6 +69,8 @@
       {:else if movedFrom}
         <span class="tag changed">Moved from {movedFrom}</span>
       {/if}
+      {#if ticket.deferred}<span class="tag later"><TrayIcon size={13} />{deferredBy ? `Deferred by ${deferredBy}` : 'Deliver later'}</span>{/if}
+      {#if warning}<span class="tag warn" title={warning.message}>⚠ {warning.short}</span>{/if}
       {#each blocks as b (b)}<span class="tag link">→ blocks {b}</span>{/each}
     </span>
   {/if}
@@ -87,6 +97,7 @@
   .card.agent { outline: 2px dotted var(--agent); outline-offset: -1px; border-color: transparent; }
   .card.locked { outline: 2px solid var(--people); outline-offset: -1px; }
   .card.selected { outline: 2px solid var(--people); outline-offset: -1px; background: var(--people-tint); }
+  .card.later { box-shadow: inset 3px 0 0 var(--later-ink); }
   .card.dragging { z-index: 20; pointer-events: none; box-shadow: 0 10px 24px rgb(47 49 40 / 0.2); cursor: grabbing; }
   .head { display: flex; align-items: center; gap: 8px; }
   .pts { margin-left: auto; font-size: 12px; color: var(--ink-muted); }

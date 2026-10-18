@@ -150,7 +150,7 @@ Stop for review after each phase. Each one ends with `pnpm typecheck`, `pnpm lin
 - Skill and `AGENTS.md` updates.
 - ✅ Done when one CLI batch can defer an epic and add a milestone, and a browser sees both live.
 
-**M3 · Web**
+**M3 · Web** ✅ done 18 Oct 2026
 - The Milestones scale, the tray, drag in and out, keyboard actions, toolbar chips and popover.
 - The scope summary, warnings, ticket tags and the Defer op styling.
 - ✅ Done when it matches `docs/design/` and a two-browser test passes (one person drags an epic

@@ -5,49 +5,64 @@
   import type { Column, DragMode, Scale, Span } from '../lib/timeline.js';
 
   let {
-    epic, cols, colW, scale, fill, count, changed, isNew, agent, lock, ondates, ondrag, ontoggle,
+    epic, cols, colW, scale, fill, count, laterCount = 0, changed, isNew, agent, lock, ondates, ondefer, ondrag, ontoggle,
   }: {
     epic: Epic;
     cols: Column[];
     colW: number;
     scale: Scale;
     fill: number;
+    /** Scheduled tickets. */
     count: number;
+    /** Tickets of this epic deferred on their own. */
+    laterCount?: number;
     changed: boolean;
     isNew: boolean;
     agent: boolean;
     lock: Claim | undefined;
     ondates: (span: Span) => void;
+    /** Move the epic to Deliver later (dropped on the tray, or the L key). */
+    ondefer: () => void;
     ondrag: (dragging: boolean) => void;
     ontoggle: () => void;
   } = $props();
 
-  let drag = $state<{ mode: DragMode; x0: number; units: number } | null>(null);
+  let drag = $state<{ mode: DragMode; x0: number; units: number; overTray: boolean } | null>(null);
+  /** Is the pointer over the Deliver later tray? The bar itself may be under it, so look through. */
+  const overTray = (e: PointerEvent): boolean => document.elementsFromPoint(e.clientX, e.clientY).some((el) => el.closest('[data-tray]'));
+  const counts = $derived(laterCount > 0 ? `${count} + ${laterCount} later` : `${count} tickets`);
   const today = todayIso();
 
   const span = $derived(drag ? dragDates(epic, drag.mode, drag.units, scale, today) : { startDate: epic.startDate, dueDate: epic.dueDate });
   const geo = $derived(barGeometry(span, cols, scale, today));
+  /** Bars stop at the last column (the milestone line, before the tray) and show they run on. */
+  const px = $derived(geo ? { left: geo.left * colW, width: Math.max(Math.min(geo.width * colW, cols.length * colW - geo.left * colW), 24) } : null);
+  const runsOn = $derived(geo !== null && px !== null && geo.width * colW > px.width + 1);
   /** Too narrow for its name: show the name just outside the bar instead. */
-  const narrow = $derived(geo !== null && geo.width * colW < 150);
+  const narrow = $derived(px !== null && px.width < 150);
 
   function down(e: PointerEvent, mode: DragMode): void {
     if (lock || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    drag = { mode, x0: e.clientX, units: 0 };
+    drag = { mode, x0: e.clientX, units: 0, overTray: false };
     ondrag(true);
   }
   function move(e: PointerEvent): void {
-    if (drag) drag.units = Math.round((e.clientX - drag.x0) / colW);
+    if (!drag) return;
+    drag.units = Math.round((e.clientX - drag.x0) / colW);
+    drag.overTray = drag.mode === 'move' && overTray(e);
   }
-  function up(): void {
+  function up(e: PointerEvent): void {
     if (!drag) return;
     const next = dragDates(epic, drag.mode, drag.units, scale, today);
     const moved = drag.units !== 0;
+    const intoTray = drag.mode === 'move' && e.type === 'pointerup' && overTray(e);
     drag = null;
     ondrag(false);
-    if (moved) ondates(next);
+    if (intoTray) ondefer();
+    else if (moved) ondates(next);
   }
 
   function key(e: KeyboardEvent): void {
@@ -59,15 +74,18 @@
     } else if (e.key === 'Enter') {
       e.preventDefault();
       ontoggle();
+    } else if (e.key === 'l' || e.key === 'L') {
+      e.preventDefault();
+      ondefer();
     }
   }
 
   const label = $derived(
-    `${epic.summary}, ${fmtRange(span)}, ${count} tickets${changed ? ', changed from Jira' : ''}${isNew ? ', new' : ''}${agent ? ', changed by agent' : ''}${lock ? `, ${lock.holder} is ${lock.kind === 'drag' ? 'moving' : 'editing'} it` : ''}. Arrow keys move by one unit; Shift+arrows change the end, Alt+arrows the start; Enter shows tickets.`,
+    `${epic.summary}, ${fmtRange(span)}${runsOn ? ', runs past the end of the timeline' : ''}, ${counts}${changed ? ', changed from Jira' : ''}${isNew ? ', new' : ''}${agent ? ', changed by agent' : ''}${lock ? `, ${lock.holder} is ${lock.kind === 'drag' ? 'moving' : 'editing'} it` : ''}. Arrow keys move by one unit; Shift+arrows change the end, Alt+arrows the start; Enter shows tickets; L moves it to Deliver later.`,
   );
 </script>
 
-{#if geo}
+{#if geo && px}
   <div
     class="bar fill-{fill}"
     class:changed
@@ -77,13 +95,15 @@
     class:dragging={!!drag}
     class:open-start={!geo.hasStart}
     class:narrow
-    style:left="{geo.left * colW}px"
-    style:width="{geo.width * colW}px"
+    class:runs-on={runsOn}
+    style:left="{px.left}px"
+    style:width="{px.width}px"
     role="slider"
     tabindex="0"
     aria-label={label}
     aria-valuetext={fmtRange(span)}
     aria-valuenow={geo.left}
+    aria-keyshortcuts="ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight Alt+ArrowLeft Alt+ArrowRight Enter L"
     onpointerdown={(e) => { down(e, 'move'); }}
     onpointermove={move}
     onpointerup={up}
@@ -102,10 +122,12 @@
         <span class="tag changed">new</span>
       {/if}
     </span>
-    {#if drag}
+    {#if drag?.overTray}
+      <span class="when">→ Deliver later</span>
+    {:else if drag}
       <span class="when">{fmtRange(span)}</span>
     {:else if !narrow}
-      <span class="count">{count} tickets</span>
+      <span class="count">{counts}</span>
     {/if}
     <span class="handle end" aria-hidden="true" onpointerdown={(e) => { down(e, 'end'); }}></span>
   </div>
@@ -140,6 +162,7 @@
   .bar.agent { outline: 2px dotted var(--agent); outline-offset: 2px; }
   .bar.locked { outline: 2px solid var(--people); outline-offset: 2px; cursor: not-allowed; }
   .bar.open-start { border-left: 2px dashed currentColor; }
+  .bar.runs-on { border-right: 2px dashed currentColor; border-top-right-radius: 0; border-bottom-right-radius: 0; }
   .name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .label { display: flex; align-items: center; gap: 8px; min-width: 0; }
   /* Too narrow for the name: the label sits just outside the bar, in normal text colour. */

@@ -47,5 +47,12 @@ export default defineConfig(
       globals: { window: 'readonly', document: 'readonly', location: 'readonly', navigator: 'readonly', WebSocket: 'readonly', fetch: 'readonly', setTimeout: 'readonly', clearTimeout: 'readonly', setInterval: 'readonly', clearInterval: 'readonly', confirm: 'readonly', MessageEvent: 'readonly', HTMLElement: 'readonly', HTMLDialogElement: 'readonly', PointerEvent: 'readonly', KeyboardEvent: 'readonly', SubmitEvent: 'readonly', Storage: 'readonly', RequestInit: 'readonly' },
     },
   },
+  {
+    files: ['**/*.svelte'],
+    rules: {
+      // `{@render snippet()}` is a void call by design; the parser reports it as a void expression.
+      '@typescript-eslint/no-confusing-void-expression': 'off',
+    },
+  },
   { files: ['eslint.config.ts', 'vitest.config.ts'], extends: [tseslint.configs.disableTypeChecked] },
 );
