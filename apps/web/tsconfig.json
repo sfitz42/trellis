@@ -1,13 +1,15 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "rootDir": "src",
-    "outDir": "dist",
-    "types": []
+    "types": ["vite/client"],
+    "allowImportingTsExtensions": true
   },
-  "include": ["src"],
-  "references": [{ "path": "../../packages/shared" }]
+  "include": ["src/**/*.ts", "src/**/*.svelte", "test/**/*.ts", "vite.config.ts", "vitest.config.ts"]
 }

@@ -1,16 +1,19 @@
 import js from '@eslint/js';
 import { defineConfig } from 'eslint/config';
+import svelte from 'eslint-plugin-svelte';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
   { ignores: ['**/dist/**', '**/node_modules/**', 'workspace/**', 'pnpm-lock.yaml'] },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
+  svelte.configs.recommended,
   {
     languageOptions: {
       parserOptions: {
-        projectService: { allowDefaultProject: ['eslint.config.ts'] },
+        projectService: { allowDefaultProject: ['eslint.config.ts', 'vitest.config.ts'] },
         tsconfigRootDir: import.meta.dirname,
+        extraFileExtensions: ['.svelte'],
       },
     },
     rules: {
@@ -21,6 +24,9 @@ export default defineConfig(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_' }],
       // State is Record<IssueId, …> by design (PLAN.md §3); removing an entry means `delete`.
       '@typescript-eslint/no-dynamic-delete': 'off',
+      // The web app replaces $state.raw / $derived values wholesale with fresh Map/Set/Date objects
+      // (immutable updates), so Svelte's reactive collection classes aren't needed.
+      'svelte/prefer-svelte-reactivity': 'off',
     },
   },
   {
@@ -34,5 +40,12 @@ export default defineConfig(
       '@typescript-eslint/no-unnecessary-type-parameters': 'off',
     },
   },
-  { files: ['eslint.config.ts'], extends: [tseslint.configs.disableTypeChecked] },
+  {
+    files: ['**/*.svelte', '**/*.svelte.ts'],
+    languageOptions: {
+      parserOptions: { parser: tseslint.parser, svelteFeatures: { experimentalGenerics: true } },
+      globals: { window: 'readonly', document: 'readonly', location: 'readonly', navigator: 'readonly', WebSocket: 'readonly', fetch: 'readonly', setTimeout: 'readonly', clearTimeout: 'readonly', setInterval: 'readonly', clearInterval: 'readonly', confirm: 'readonly', MessageEvent: 'readonly', HTMLElement: 'readonly', HTMLDialogElement: 'readonly', PointerEvent: 'readonly', KeyboardEvent: 'readonly', SubmitEvent: 'readonly', Storage: 'readonly', RequestInit: 'readonly' },
+    },
+  },
+  { files: ['eslint.config.ts', 'vitest.config.ts'], extends: [tseslint.configs.disableTypeChecked] },
 );

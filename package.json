@@ -7,10 +7,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --filter @trellis/server dev",
-    "build": "tsc -b",
+    "dev": "pnpm --parallel --filter @trellis/server --filter @trellis/web dev",
+    "build": "tsc -b && pnpm --filter @trellis/web build",
     "start": "pnpm --filter @trellis/server start",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b && pnpm --filter @trellis/web typecheck",
     "test": "vitest run",
     "lint": "eslint --flag unstable_native_nodejs_ts_config .",
     "jira:auth": "pnpm --filter @trellis/jira exec tsx src/discovery/check-auth.ts",
@@ -22,6 +22,8 @@
     "@eslint/js": "10.0.1",
     "@types/node": "22.20.5",
     "eslint": "10.13.0",
+    "eslint-plugin-svelte": "3.23.1",
+    "svelte-eslint-parser": "1.9.0",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.2",

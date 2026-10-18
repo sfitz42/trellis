@@ -8,6 +8,8 @@ export interface ServerConfig {
   projectKey: string | undefined;
   /** Poll files instead of fs.watch (Docker Desktop bind mounts on macOS/Windows). */
   watchPoll: boolean;
+  /** Built SPA to serve (apps/web/dist). Skipped if the folder doesn't exist (e.g. in dev). */
+  staticDir: string;
 }
 
 // src/ and dist/ both sit two levels below the repo root's apps/ folder.
@@ -22,5 +24,6 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): ServerConfi
     workspaceDir: env['WORKSPACE_DIR'] ?? `${repoRoot}workspace`,
     projectKey: env['JIRA_PROJECT_KEY'] || undefined,
     watchPoll: env['WATCH_POLL'] === '1',
+    staticDir: env['STATIC_DIR'] ?? `${repoRoot}apps/web/dist`,
   };
 }

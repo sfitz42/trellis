@@ -1,0 +1,143 @@
+/* Design tokens (PLAN.md §10) and base styles. */
+:root {
+  --bg: #fff3e8;
+  --surface: #fffbf6;
+  --border: #e6cdb9;
+  --line: #f2e1d2;
+  --ink: #2f3128;
+  --ink-muted: #5e6250;
+  --structure: #4f5343;
+  --structure-ink: #fffbf6;
+
+  --people: #3e6a70;
+  --people-tint: #d3e2e1;
+  --people-text: #2c4e53;
+
+  --changed: #b97a58;
+  --changed-border: #cb997e;
+  --changed-tint: #f8e3d4;
+  --changed-text: #7a4a2e;
+
+  --agent: #8e6c8a;
+  --agent-solid: #7d5a79;
+  --agent-tint: #eadfe8;
+  --agent-text: #5a3d57;
+
+  --warn: #c9963a;
+  --warn-tint: #f5e6c4;
+  --warn-text: #6b4e14;
+
+  --error: #9e4436;
+  --error-tint: #f3d8d2;
+  --error-text: #7e3226;
+
+  --epic-1: #ddbea9;
+  --epic-1-ink: #5b3f2c;
+  --epic-2: #d3e2e1;
+  --epic-2-ink: #2c4e53;
+  --epic-3: #f1d3c0;
+  --epic-3-ink: #6b3f26;
+  --epic-4: #eadfe8;
+  --epic-4-ink: #5a3d57;
+  --epic-5: #f5e6c4;
+  --epic-5-ink: #6b4e14;
+
+  --font: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --radius: 6px;
+  --touch: 44px;
+  --label-col: 250px;
+
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+button { cursor: pointer; }
+
+:focus-visible {
+  outline: 2px solid var(--people);
+  outline-offset: 2px;
+}
+
+.mono, code, kbd { font-family: var(--mono); }
+
+.key {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+  letter-spacing: 0.02em;
+}
+
+.btn {
+  min-height: var(--touch);
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  white-space: nowrap;
+}
+.btn:hover { border-color: var(--changed-border); }
+.btn.primary { background: var(--structure); border-color: var(--structure); color: var(--structure-ink); font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; }
+.btn.small { min-height: 32px; padding: 0 10px; font-size: 13px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.field { display: grid; gap: 6px; }
+.field > span { font-size: 12px; color: var(--ink-muted); }
+.field.changed > span { color: var(--changed-text); }
+.input {
+  min-height: var(--touch);
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  width: 100%;
+}
+.field.changed .input { background: var(--changed-tint); border-color: var(--changed-border); }
+textarea.input { min-height: 96px; resize: vertical; }
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.tag.status { background: var(--line); color: var(--ink-muted); }
+.tag.status.indeterminate { background: var(--changed-tint); color: var(--changed-text); }
+.tag.status.done { background: var(--people-tint); color: var(--people-text); }
+.tag.people { background: var(--people); color: #fff; }
+.tag.agent { background: var(--agent-solid); color: #fff; }
+.tag.changed { background: var(--changed-tint); color: var(--changed-text); }
+.tag.warn { background: var(--warn-tint); color: var(--warn-text); }
+.tag.error { background: var(--error-tint); color: var(--error-text); }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

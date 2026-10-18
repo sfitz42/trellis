@@ -1,7 +1,7 @@
 // Real-time protocol (docs/PLAN.md §5), shared by server, web app and CLI.
 import { z } from 'zod';
 import type { Changeset } from './changeset.js';
-import type { Batch, BatchResult, IssueId, RoadmapState } from './schemas.js';
+import type { Batch, BatchResult, IssueId, OplogEntry, RoadmapState, Snapshot } from './schemas.js';
 import { Batch as BatchSchema, IssueId as IssueIdSchema } from './schemas.js';
 
 export const ClientKind = z.enum(['human', 'agent']);
@@ -63,14 +63,25 @@ export interface Status {
 
 /** Messages the server sends over `/ws`. */
 export type ServerMessage =
-  | { type: 'welcome'; state: RoadmapState; snapshotSummary: SnapshotSummary; presence: PresenceClient[]; claims: Claim[]; version: number }
+  | {
+      type: 'welcome';
+      state: RoadmapState;
+      /** The Jira snapshot the session is based on (for "differs from Jira" and valid choices). */
+      snapshot: Snapshot | null;
+      snapshotSummary: SnapshotSummary;
+      /** The most recent applied batches, oldest first (activity feed, undo). */
+      recent: OplogEntry[];
+      presence: PresenceClient[];
+      claims: Claim[];
+      version: number;
+    }
   | { type: 'batch.applied'; batch: Batch & { id: string }; results: BatchResult; version: number }
   | { type: 'batch.result'; requestId: string; results: BatchResult }
   | { type: 'presence'; clients: PresenceClient[] }
   | { type: 'claims'; claims: Claim[] }
   | { type: 'freeze'; frozen: RoadmapState['frozen']; changeset: Changeset | null }
   | { type: 'snapshot.available'; summary: SnapshotSummary }
-  | { type: 'snapshot.reloaded'; summary: SnapshotSummary; state: RoadmapState }
+  | { type: 'snapshot.reloaded'; summary: SnapshotSummary; state: RoadmapState; snapshot: Snapshot }
   | { type: 'apply.progress'; log: unknown }
   | { type: 'error'; code: string; message: string };
 

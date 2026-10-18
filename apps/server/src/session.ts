@@ -34,6 +34,9 @@ const StateFile = z.object({
   batchSeq: z.number().int().nonnegative(),
 });
 
+/** How many recent batches a new client receives in `welcome`. */
+const RECENT_BATCHES = 100;
+
 export class SessionError extends Error {
   constructor(readonly code: string, message: string, readonly status = 409, readonly details?: unknown) {
     super(message);
@@ -143,7 +146,10 @@ export class Session {
 
   welcome(): Extract<ServerMessage, { type: 'welcome' }> {
     this.expireClaims();
-    return { type: 'welcome', state: this.state, snapshotSummary: this.snapshotSummary(), presence: this.presence(), claims: this.claimList(), version: this.state.version };
+    return {
+      type: 'welcome', state: this.state, snapshot: this.baseSnapshot, snapshotSummary: this.snapshotSummary(),
+      recent: this.oplog.slice(-RECENT_BATCHES), presence: this.presence(), claims: this.claimList(), version: this.state.version,
+    };
   }
 
   // --- batches
@@ -332,7 +338,7 @@ export class Session {
     if (this.state.frozen) await this.ws.writeJson(FILES.changeset, this.changeset());
     await this.flush();
     const summary = this.snapshotSummary();
-    this.emit({ type: 'snapshot.reloaded', summary, state: this.state });
+    this.emit({ type: 'snapshot.reloaded', summary, state: this.state, snapshot: next });
     return { summary, ...info };
   }
 

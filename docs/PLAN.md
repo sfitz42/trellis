@@ -126,7 +126,8 @@ imports server code; the CLI and jira packages never import server or web code.
   `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`,
   `verbatimModuleSyntax`, `module`/`moduleResolution: "NodeNext"` (bundler resolution for the web
   app). Packages use project references; `pnpm typecheck` runs `tsc -b` plus `svelte-check`, and it
-  must pass with zero errors at the end of every phase. Svelte components use `<script lang="ts">`.
+  must pass with zero errors at the end of every phase. The web app is outside the `tsc -b` solution
+  (tsc can't follow `.svelte` imports); `svelte-check` checks all of it, `.ts` included. Svelte components use `<script lang="ts">`.
   No `any` without a comment explaining why.
 - **Install scripts disabled.** `.npmrc` contains `ignore-scripts=true`, so no dependency's
   `preinstall`/`install`/`postinstall` runs. Consequences to design for:
@@ -140,7 +141,9 @@ imports server code; the CLI and jira packages never import server or web code.
   - CI and Docker install with `pnpm install --frozen-lockfile --ignore-scripts`.
 - **Server:** Fastify, `@fastify/websocket` (or `ws`), `@fastify/static` to serve the built SPA.
 - **Web:** Svelte 5 (runes), Vite, plain CSS with custom properties (tokens in §10). No component
-  library. Drag and drop with pointer events (or `svelte-dnd-action` if it fits cleanly).
+  library. IBM Plex loads from Google Fonts with system fallbacks (offline LANs fall back cleanly).
+  Logic lives in plain `.ts` modules with unit tests; every screen also has a server-side render
+  test (`svelte/server`) against the fixture. Visual checks use the facilitator's Playwright MCP. Drag and drop with pointer events (or `svelte-dnd-action` if it fits cleanly).
 - **Validation:** `zod` schemas in `packages/shared`, used by server, CLI and scripts.
 - **CLI:** `commander` (or `citty`), compiled to a bin named `trellis`.
 
@@ -286,7 +289,8 @@ Client → server:
 - `claim { ids, note?, ttlSec? }`, `release { ids }`
 
 Server → client:
-- `welcome { state, snapshotSummary, presence, claims, version }`
+- `welcome { state, snapshot, snapshotSummary, recent, presence, claims, version }` (`snapshot` is the
+  base Jira snapshot, for "differs from Jira" and valid choices; `recent` the last 100 applied batches)
 - `batch.applied { batch, results, version }` (to everyone, including sender)
 - `batch.result { requestId, results }` (to sender, for optimistic rollback)
 - `presence { clients: [...] }`, `claims { claims: [...] }`

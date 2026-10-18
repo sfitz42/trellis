@@ -9,6 +9,7 @@
     "start": "node --env-file-if-exists=../../.env dist/main.js"
   },
   "dependencies": {
+    "@fastify/static": "10.1.6",
     "@fastify/websocket": "11.3.4",
     "@trellis/shared": "workspace:*",
     "fastify": "5.12.7",

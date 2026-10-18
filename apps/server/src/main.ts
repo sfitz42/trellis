@@ -6,6 +6,7 @@ const { app, close } = await buildApp({
   workspaceDir: config.workspaceDir,
   projectKey: config.projectKey,
   watchPoll: config.watchPoll,
+  staticDir: config.staticDir,
   logger: true,
 });
 

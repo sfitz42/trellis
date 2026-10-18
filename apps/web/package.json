@@ -4,9 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc -b"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
   },
   "dependencies": {
     "@trellis/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "svelte": "5.57.2",
+    "svelte-check": "4.7.7",
+    "vite": "8.3.4"
   }
 }
